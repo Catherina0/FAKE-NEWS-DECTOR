@@ -1,0 +1,11 @@
+bak/
+example/
+install environment/
+myenv/
+searxng_config/
+temp_images/
+test/
+venv/
+news_credibility.log
+__pycache__/
+.env
