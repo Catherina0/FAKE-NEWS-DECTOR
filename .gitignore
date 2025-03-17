@@ -6,6 +6,15 @@ searxng_config/
 temp_images/
 test/
 venv/
+news_credibility.py
 news_credibility.log
 __pycache__/
 .env
+debug.log
+GUIDE.md
+analysis.md
+myenv_new/
+others/
+info.md
+saved_news/
+print_formatted_result

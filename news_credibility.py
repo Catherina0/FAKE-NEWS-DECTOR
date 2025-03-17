@@ -2059,6 +2059,14 @@ def analyze_image_authenticity(image_path):
     logger = logging.getLogger()
     logger.info(f"分析图片真实性: {image_path}")
     
+    # 导入需要的库
+    try:
+        import exifread
+        has_exifread = True
+    except ImportError:
+        logger.error("未安装exifread库，无法读取图片元数据")
+        has_exifread = False
+    
     try:
         # 检查文件是否存在
         if not os.path.exists(image_path):
@@ -2094,38 +2102,41 @@ def analyze_image_authenticity(image_path):
         
         try:
             # 使用exifread读取EXIF数据
-            with open(image_path, 'rb') as f:
-                tags = exifread.process_file(f)
-            
-            if tags:
-                # 提取相机信息
-                camera_make = tags.get('Image Make', None)
-                camera_model = tags.get('Image Model', None)
+            if has_exifread:
+                with open(image_path, 'rb') as f:
+                    tags = exifread.process_file(f)
                 
-                if camera_make or camera_model:
-                    metadata_score += 0.2
-                    metadata_details.append(f"相机信息: {camera_make} {camera_model}")
-                
-                # 提取拍摄时间
-                date_time = tags.get('EXIF DateTimeOriginal', None)
-                if date_time:
-                    metadata_score += 0.1
-                    metadata_details.append(f"拍摄时间: {date_time}")
-                
-                # 提取GPS信息
-                gps_latitude = tags.get('GPS GPSLatitude', None)
-                gps_longitude = tags.get('GPS GPSLongitude', None)
-                
-                if gps_latitude and gps_longitude:
-                    metadata_score += 0.2
-                    metadata_details.append("包含GPS位置信息")
-                
-                # 其他EXIF信息
-                if len(tags) > 5:
-                    metadata_score += 0.1
-                    metadata_details.append(f"包含{len(tags)}项EXIF元数据")
+                if tags:
+                    # 提取相机信息
+                    camera_make = tags.get('Image Make', None)
+                    camera_model = tags.get('Image Model', None)
+                    
+                    if camera_make or camera_model:
+                        metadata_score += 0.2
+                        metadata_details.append(f"相机信息: {camera_make} {camera_model}")
+                    
+                    # 提取拍摄时间
+                    date_time = tags.get('EXIF DateTimeOriginal', None)
+                    if date_time:
+                        metadata_score += 0.1
+                        metadata_details.append(f"拍摄时间: {date_time}")
+                    
+                    # 提取GPS信息
+                    gps_latitude = tags.get('GPS GPSLatitude', None)
+                    gps_longitude = tags.get('GPS GPSLongitude', None)
+                    
+                    if gps_latitude and gps_longitude:
+                        metadata_score += 0.2
+                        metadata_details.append("包含GPS位置信息")
+                    
+                    # 其他EXIF信息
+                    if len(tags) > 5:
+                        metadata_score += 0.1
+                        metadata_details.append(f"包含{len(tags)}项EXIF元数据")
+                else:
+                    metadata_details.append("图像不包含EXIF元数据，可能已被处理或是截图")
             else:
-                metadata_details.append("图像不包含EXIF元数据，可能已被处理或是截图")
+                metadata_details.append("无法读取图片元数据: exifread库未安装")
         except Exception as e:
             logger.error(f"读取图片元数据时出错: {e}")
             metadata_details.append(f"读取元数据出错: {e}")
