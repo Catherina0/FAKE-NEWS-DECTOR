@@ -16,6 +16,22 @@ logger = logging.getLogger(__name__)
 # 全局变量，用于标记API是否可用
 SEARXNG_AVAILABLE = False
 
+# 公共SearXNG实例列表，在本地实例不可用时可以尝试使用（其实都不可用）
+PUBLIC_SEARXNG_INSTANCES = [
+    "https://searx.be",
+    "https://search.mdosch.de",
+    "https://search.ononoki.org",
+    "https://searx.tiekoetter.com",
+    "https://searx.gnu.style"
+]
+
+# 导入配置
+try:
+    from config import USE_PUBLIC_SEARXNG
+except ImportError:
+    # 如果无法导入，使用默认值
+    USE_PUBLIC_SEARXNG = False
+
 def query_searxng(query, max_retries=3, num_results=5):
     """
     使用SearXNG搜索引擎进行查询
@@ -35,12 +51,30 @@ def query_searxng(query, max_retries=3, num_results=5):
         logger.warning("SearXNG已被标记为不可用，跳过查询")
         return []
     
-    # 优先使用本地SearXNG实例
-    local_searxng_url = "http://localhost:8080"
+    # 从配置中获取SearXNG URL
+    from config import SEARXNG_URL
+    searxng_base_url = SEARXNG_URL
     
-    # 尝试使用本地实例
+    # 确保URL格式正确
+    # 如果URL包含/search，获取基础URL
+    if '/search' in searxng_base_url:
+        searxng_base_url = searxng_base_url.split('/search')[0]
+    
+    # 确保URL不以/结尾
+    searxng_base_url = searxng_base_url.rstrip('/')
+    
+    # 确保URL包含协议
+    if not searxng_base_url.startswith(('http://', 'https://')):
+        searxng_base_url = 'http://' + searxng_base_url
+    
+    # 构建API URL
+    api_url = f"{searxng_base_url}/search"
+    
+    logger.info(f"使用SearXNG实例: {searxng_base_url}")
+    
+    # 尝试连接SearXNG实例
     try:
-        # 测试本地实例连接
+        # 测试实例连接
         session = requests.Session()
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -54,24 +88,46 @@ def query_searxng(query, max_retries=3, num_results=5):
             "Upgrade-Insecure-Requests": "1"
         }
         
-        response = session.get(local_searxng_url, headers=headers, timeout=5)
-        if response.status_code == 200 and ("searx" in response.text.lower() or "search" in response.text.lower()):
-            logger.info("使用本地SearXNG实例")
-            searxng_url = local_searxng_url
+        logger.debug(f"尝试连接到SearXNG基础URL: {searxng_base_url}")
+        response = session.get(searxng_base_url, headers=headers, timeout=10)  # 增加超时时间
+        
+        # 更详细的连接检查
+        if response.status_code == 200:
+            logger.debug(f"SearXNG连接响应内容前100字符: {response.text[:100]}")
+            
+            # 检查是否包含SearXNG的特征
+            # 可能的特征包括searx, searxng, search, engine, preferences等
+            searxng_features = ['searx', 'search', 'engine', 'preferences', 'about', 'query']
+            found_features = [feature for feature in searxng_features if feature in response.text.lower()]
+            
+            if found_features:
+                logger.info(f"SearXNG实例连接成功，检测到特征: {', '.join(found_features)}")
+                # 继续执行，不要立刻返回，以便可以查询
+            else:
+                logger.warning(f"SearXNG响应不包含预期特征，可能不是SearXNG实例: {searxng_base_url}")
+                # 尝试请求一次搜索，看是否能正常工作
+                try:
+                    test_response = session.get(f"{searxng_base_url}/search?q=test&format=json", headers=headers, timeout=10)
+                    if test_response.status_code == 200:
+                        logger.info("SearXNG搜索测试成功，继续执行")
+                    else:
+                        logger.error(f"SearXNG搜索测试失败，状态码: {test_response.status_code}")
+                        SEARXNG_AVAILABLE = False
+                        return []
+                except Exception as test_e:
+                    logger.error(f"SearXNG搜索测试异常: {test_e}")
+                    SEARXNG_AVAILABLE = False
+                    return []
         else:
-            # 如果本地实例不可用，设置为不可用并返回
-            logger.error("本地SearXNG实例不可用")
+            # 如果实例不可用，设置为不可用并返回
+            logger.error(f"SearXNG实例返回非200状态码: {response.status_code}")
             SEARXNG_AVAILABLE = False
             return []
     except Exception as e:
-        # 如果本地实例连接失败，设置为不可用并返回
-        logger.error(f"本地SearXNG实例连接失败: {str(e)}")
+        # 如果实例连接失败，设置为不可用并返回
+        logger.error(f"SearXNG实例连接失败: {str(e)}")
         SEARXNG_AVAILABLE = False
         return []
-    
-    # 构建API URL
-    encoded_query = quote_plus(query)
-    api_url = f"{searxng_url}/search"
     
     # 创建一个新的会话，避免连接池问题
     session = requests.Session()
@@ -92,7 +148,7 @@ def query_searxng(query, max_retries=3, num_results=5):
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-                "Referer": searxng_url,
+                "Referer": searxng_base_url,
                 "DNT": "1",
                 "Connection": "keep-alive",
                 "Sec-Fetch-Dest": "document",
@@ -187,6 +243,12 @@ def search_with_searxng(query, num_results=10):
         "results": search_results,
         "result_count": len(search_results)
     }
+    
+    # 记录搜索结果
+    if not search_results:
+        logger.warning(f"搜索查询 '{query}' 未返回任何结果")
+    else:
+        logger.info(f"搜索查询 '{query}' 返回了 {len(search_results)} 个结果")
     
     return formatted_results
 
@@ -308,10 +370,55 @@ def test_searxng_connection():
     
     logging.info("测试SearXNG连接...")
     
-    # 优先使用本地SearXNG实例
-    local_searxng_url = "http://localhost:8080"
+    # 从配置中获取SearXNG URL
+    from config import SEARXNG_URL
+    searxng_base_url = SEARXNG_URL
     
-    # 使用本地实例
+    # 确保URL格式正确
+    # 如果URL包含/search，获取基础URL
+    if '/search' in searxng_base_url:
+        searxng_base_url = searxng_base_url.split('/search')[0]
+    
+    # 确保URL不以/结尾
+    searxng_base_url = searxng_base_url.rstrip('/')
+    
+    # 确保URL包含协议
+    if not searxng_base_url.startswith(('http://', 'https://')):
+        searxng_base_url = 'http://' + searxng_base_url
+    
+    logging.info(f"使用SearXNG基础URL: {searxng_base_url}")
+    
+    # 尝试连接配置的SearXNG实例
+    local_instance_available = test_specific_searxng_instance(searxng_base_url)
+    
+    # 如果本地实例不可用，并且允许使用公共实例，尝试连接公共实例
+    if not local_instance_available and USE_PUBLIC_SEARXNG:
+        logging.warning(f"本地SearXNG实例 {searxng_base_url} 不可用，尝试使用公共实例")
+        
+        for instance in PUBLIC_SEARXNG_INSTANCES:
+            logging.info(f"尝试公共SearXNG实例: {instance}")
+            if test_specific_searxng_instance(instance):
+                logging.info(f"成功连接到公共SearXNG实例: {instance}")
+                return True
+        
+        logging.error("所有公共SearXNG实例均不可用")
+        SEARXNG_AVAILABLE = False
+        return False
+    
+    return local_instance_available
+
+def test_specific_searxng_instance(searxng_base_url):
+    """
+    测试特定的SearXNG实例
+    
+    参数:
+        searxng_base_url (str): SearXNG实例的基础URL
+    
+    返回:
+        bool: 连接是否成功
+    """
+    global SEARXNG_AVAILABLE
+    
     try:
         # 创建一个新的会话
         session = requests.Session()
@@ -332,60 +439,92 @@ def test_searxng_connection():
             "Pragma": "no-cache"
         }
         
-        # 发送请求
-        logging.info(f"尝试连接到 {local_searxng_url}")
-        response = session.get(local_searxng_url, headers=headers, timeout=5)
+        # 发送请求到基础URL
+        logging.info(f"尝试连接到 {searxng_base_url}")
+        response = session.get(searxng_base_url, headers=headers, timeout=10)  # 增加超时时间
         
         # 检查响应状态码
         if response.status_code != 200:
             logging.warning(f"SearXNG连接测试返回非200状态码: {response.status_code}")
-            SEARXNG_AVAILABLE = False
             return False
             
         # 检查响应是否包含SearXNG的特征
         response_text = response.text.lower()
-        if "searx" in response_text or "search" in response_text:
-            logging.info("本地SearXNG连接测试成功")
+        logging.debug(f"SearXNG响应内容前100字符: {response_text[:100]}")
+        
+        # 更详细的特征检查
+        searxng_features = ['searx', 'search', 'engine', 'preferences', 'about', 'query']
+        found_features = [feature for feature in searxng_features if feature in response_text]
+        
+        if found_features:
+            logging.info(f"SearXNG实例连接成功，检测到特征: {', '.join(found_features)}")
             
             # 尝试进行一次简单搜索，确保搜索功能正常
             try:
-                test_search_url = f"{local_searxng_url}/search"
+                # 构建搜索URL
+                search_url = f"{searxng_base_url}/search"
                 test_params = {"q": "test", "format": "json"}
-                test_response = session.get(test_search_url, params=test_params, headers=headers, timeout=5)
+                
+                logging.info(f"测试SearXNG搜索功能: {search_url}")
+                test_response = session.get(search_url, params=test_params, headers=headers, timeout=10)
                 
                 if test_response.status_code == 200:
                     try:
                         result = test_response.json()
                         if "results" in result:
-                            logging.info("SearXNG搜索功能测试成功")
+                            logging.info(f"SearXNG搜索功能测试成功，结果数: {len(result.get('results', []))}")
                             SEARXNG_AVAILABLE = True
                             return True
+                        else:
+                            logging.warning("SearXNG搜索结果不包含'results'字段")
+                            # 尝试查看返回内容
+                            logging.debug(f"响应内容前100字符: {test_response.text[:100]}")
                     except Exception as e:
                         logging.warning(f"SearXNG搜索结果解析失败: {str(e)}")
+                        logging.debug(f"响应内容前100字符: {test_response.text[:100]}")
                 else:
                     logging.warning(f"SearXNG搜索测试返回非200状态码: {test_response.status_code}")
             except Exception as e:
                 logging.warning(f"SearXNG搜索功能测试失败: {str(e)}")
-                
-            # 即使搜索测试失败，如果基本连接成功，仍然标记为可用
+            
+            # 即使搜索测试失败，如果基本连接成功且找到特征，仍然标记为可用
+            logging.info("基于基础连接成功，标记SearXNG为可用")
             SEARXNG_AVAILABLE = True
             return True
         else:
-            logging.warning("本地SearXNG连接测试返回意外响应")
-            SEARXNG_AVAILABLE = False
+            # 如果没有找到特征，尝试直接测试搜索端点
+            try:
+                search_url = f"{searxng_base_url}/search"
+                test_params = {"q": "test", "format": "json"}
+                
+                logging.info(f"直接测试SearXNG搜索端点: {search_url}")
+                test_response = session.get(search_url, params=test_params, headers=headers, timeout=10)
+                
+                if test_response.status_code == 200:
+                    try:
+                        result = test_response.json()
+                        if "results" in result:
+                            logging.info("SearXNG搜索端点测试成功，标记为可用")
+                            SEARXNG_AVAILABLE = True
+                            return True
+                    except Exception as e:
+                        logging.warning(f"解析SearXNG搜索端点响应失败: {str(e)}")
+                
+                logging.warning("SearXNG搜索端点测试失败")
+            except Exception as e:
+                logging.warning(f"访问SearXNG搜索端点出错: {str(e)}")
+                
+            logging.warning("SearXNG连接测试返回意外响应，未找到SearXNG特征")
             return False
     except requests.exceptions.ConnectionError as e:
-        logging.error(f"本地SearXNG连接失败 (连接错误): {str(e)}")
-        SEARXNG_AVAILABLE = False
+        logging.error(f"SearXNG连接失败 (连接错误): {str(e)}")
         return False
     except requests.exceptions.Timeout as e:
-        logging.error(f"本地SearXNG连接超时: {str(e)}")
-        SEARXNG_AVAILABLE = False
+        logging.error(f"SearXNG连接超时: {str(e)}")
         return False
     except Exception as e:
-        logging.error(f"本地SearXNG连接测试失败: {str(e)}")
+        logging.error(f"SearXNG连接测试失败: {str(e)}")
         logging.error(traceback.format_exc())
-        SEARXNG_AVAILABLE = False
         return False
     finally:
         # 确保关闭会话

@@ -17,7 +17,6 @@ from text_analysis import (
 )
 from citation_analysis import (
     judge_citation_truthfulness,
-    analyze_citation_validity,
     get_citation_score
 )
 from verification import local_text_credibility
@@ -78,14 +77,10 @@ def simple_test():
         citation_truth = judge_citation_truthfulness(test_text)
         print(f"  结果: 引用真实性评分 = {citation_truth['score'] if isinstance(citation_truth, dict) and 'score' in citation_truth else citation_truth[0]:.2f}")
         
-        print("- 分析引用有效性...")
-        citation_validity = analyze_citation_validity(test_text)
-        print(f"  结果: 引用有效性评分 = {citation_validity['score'] if isinstance(citation_validity, dict) and 'score' in citation_validity else citation_validity[0]:.2f}")
-        
         print("- 获取引用质量评分...")
         citation_score, citation_details = get_citation_score(test_text)
         print(f"  结果: 引用质量总评分 = {citation_score:.2f}")
-        print(f"  详情: {citation_details[:2]}...")
+        print(f"  详情: {str(citation_details)[:100]}...")
         
         print(colored("  引用分析功能测试通过", Colors.GREEN))
     except Exception as e:

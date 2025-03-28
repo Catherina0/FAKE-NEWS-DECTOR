@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+文本分析模块
+负责对新闻文本进行各种分析（其实是毫无意义的claude3.7生成的凑数用的本地算法）
+"""
+
 import logging
 import re
 import traceback
+from typing import Tuple, Dict, Any, List, Optional
 from utils import find_common_substrings
 
+# 初始化logger
 logger = logging.getLogger(__name__)
 
-def check_ai_content(text):
+def check_ai_content(text: str) -> Tuple[float, List[str]]:
     """
     检测文本是否由AI生成
     
@@ -18,9 +25,16 @@ def check_ai_content(text):
     3. 常见AI表达方式识别
     4. 词汇多样性评估
     
+    参数:
+        text (str): 要分析的文本
+        
     返回:
-        (人类撰写可能性评分(0-1), 详细分析结果列表)
+        Tuple[float, List[str]]: (人类撰写可能性评分(0-1), 详细分析结果列表)
     """
+    logger.info("本地AI内容检测功能已禁用")
+    return 0.5, ["本地分析功能已禁用"]
+
+    '''
     logger.info("开始进行AI内容检测...")
     
     # 初始化评分和详情
@@ -142,8 +156,9 @@ def check_ai_content(text):
     
     logger.info(f"AI内容检测完成，评分: {score:.2f}")
     return score, details
+    '''
 
-def analyze_language_neutrality(text):
+def analyze_language_neutrality(text: str) -> Tuple[float, List[str]]:
     """
     分析文本的语言中立性
     
@@ -155,8 +170,12 @@ def analyze_language_neutrality(text):
         text: 新闻文本
         
     返回:
-        (中立性评分(0-1), 详细分析结果列表)
+        Tuple[float, List[str]]: (中立性评分(0-1), 详细分析结果列表)
     """
+    logger.info("本地语言中立性分析功能已禁用")
+    return 0.5, ["本地分析功能已禁用"]
+
+    '''
     logger.info("开始分析语言中立性...")
     
     # 1. 情感词汇检测
@@ -316,8 +335,9 @@ def analyze_language_neutrality(text):
     
     logger.info(f"语言中立性分析完成，评分: {neutrality_score:.2f}")
     return neutrality_score, details
+    '''
 
-def analyze_source_quality(text, url=None):
+def analyze_source_quality(text: str, url: Optional[str] = None) -> Tuple[float, List[str]]:
     """
     分析新闻来源的质量
     
@@ -444,7 +464,7 @@ def analyze_source_quality(text, url=None):
     logger.info(f"来源质量分析完成，评分: {score:.2f}")
     return score, details
 
-def analyze_text_logic(text):
+def analyze_text_logic(text: str) -> Tuple[float, str]:
     """
     分析文本的逻辑性
     
@@ -460,7 +480,7 @@ def analyze_text_logic(text):
     logger.info("使用基本逻辑分析")
     return basic_logic_analysis(text)
 
-def basic_logic_analysis(text):
+def basic_logic_analysis(text: str) -> Tuple[float, str]:
     """
     基本的文本逻辑分析
     
@@ -529,7 +549,7 @@ def basic_logic_analysis(text):
     
     return score, " ".join(details)
 
-def local_news_validation(text):
+def local_news_validation(text: str) -> Tuple[float, str]:
     """
     本地新闻验证
     

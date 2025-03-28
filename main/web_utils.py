@@ -16,6 +16,8 @@ from fake_useragent import UserAgent
 import chardet
 import urllib.parse
 from PIL import Image, ImageStat
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 
 # 导入本地模块
 from utils import Colors, colored
@@ -555,6 +557,18 @@ def fetch_news_content(url):
             temp_dir = os.path.join(os.getcwd(), "temp_images")
             os.makedirs(temp_dir, exist_ok=True)
             
+            # 创建会话对象用于下载
+            session = requests.Session()
+            retry_strategy = Retry(
+                total=3,  # 最大重试次数
+                backoff_factor=0.5,  # 重试等待时间因子
+                status_forcelist=[429, 500, 502, 503, 504],
+                allowed_methods=["HEAD", "GET", "OPTIONS"]
+            )
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            
             # 筛选和下载图片，最多9张
             downloaded_count = 0
             for i, img_url in enumerate(image_urls):
@@ -563,8 +577,26 @@ def fetch_news_content(url):
                     
                 try:
                     # 预先检查图片是否有效
-                    img_response = requests.get(img_url, timeout=10, verify=False, stream=True)
-                    img_response.raise_for_status()
+                    for attempt in range(3):  # 最多重试3次
+                        try:
+                            img_response = session.get(
+                                img_url,
+                                timeout=10,
+                                verify=False,  # 禁用SSL验证
+                                stream=True,
+                                headers={
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                                }
+                            )
+                            img_response.raise_for_status()
+                            break  # 如果成功就跳出重试循环
+                        except requests.exceptions.SSLError as ssl_err:
+                            if attempt < 2:  # 最后一次尝试就不等待了
+                                wait_time = 0.5 * (2 ** attempt)
+                                logger.warning(f"下载图片时遇到SSL错误，等待 {wait_time:.2f} 秒后重试: {ssl_err}")
+                                time.sleep(wait_time)
+                            else:
+                                raise  # 最后一次尝试失败，抛出异常
                     
                     # 检查内容类型
                     content_type = img_response.headers.get('Content-Type', '')
@@ -631,4 +663,5 @@ def fetch_news_content(url):
     except Exception as e:
         logger.error(f"获取新闻内容时出错: {e}")
         logger.error(traceback.format_exc())
-        return None, [] 
+        return None, []
+

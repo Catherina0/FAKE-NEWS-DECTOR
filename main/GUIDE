@@ -1,0 +1,366 @@
+### main.py - 程序入口
+
+- `parse_arguments()` - 解析命令行参数
+- `main()` - 主程序入口，组织工作流
+- `setup_environment()` - 设置程序环境
+- `print_banner()` - 显示程序横幅
+- `handle_test_mode()` - 处理测试模式功能
+
+**工作流程**：
+1. 程序启动时首先解析命令行参数
+2. 设置日志和环境配置
+3. 初始化服务连接状态
+4. 根据用户输入选择分析URL或本地文件
+5. 调用core_analyzer进行分析
+6. 格式化并展示分析结果
+
+### core_analyzer.py - 核心分析逻辑
+
+- `analyze_news_credibility()` - 综合分析新闻可信度，是系统的核心函数
+- `save_news_to_local()` - 保存新闻和分析结果到本地文件系统
+
+**analyze_news_credibility函数工作流程**：
+1. 初始化结果字典，包含总体评分、各项评分、详细分析等字段
+2. 检查关键服务可用性（DeepSeek API和SearXNG）
+3. 如果DeepSeek可用，调用analyze_with_deepseek_v3获取AI分析结果
+4. 提取AI生成内容检测数据，包括表达模式、词汇多样性、句子变化等多个维度
+5. 提取语言中立性分析数据，包括情感词汇、情感平衡、极端表述等方面
+6. 分析来源质量和引用质量
+7. 如果条件允许，执行交叉验证
+8. 分析文本逻辑性作为新闻价值分析的一部分
+9. 根据配置的权重计算加权平均总分
+10. 返回包含所有分析数据的结果字典
+
+**数据结构**：
+- result字典包含以下主要字段：
+  - "总体评分"：0-1之间的综合可信度评分
+  - "各项评分"：各维度的评分，如AI内容检测、语言中立性等
+  - "详细分析"：各维度的详细分析文本和结构化数据
+  - "评分详情"：更细粒度的评分项，如表达模式、词汇多样性等
+  - "原始分析数据"：完整的DeepSeek API返回结果
+  - "问题"：发现的可信度问题列表
+  - "警告"：服务限制等警告信息
+  - "新闻价值分析"：对新闻价值的独立评估
+
+### text_analysis.py - 文本分析和评估
+
+- `check_ai_content()` - 检测内容是否由AI生成（使用本地算法）
+- `analyze_language_neutrality()` - 分析语言中立性
+- `analyze_source_quality()` - 分析来源质量
+- `analyze_text_logic()` - 分析文本逻辑性
+
+**工作流程**：
+1. check_ai_content通过分析文本的特征模式识别AI生成内容，包括句式结构、重复模式等
+2. analyze_language_neutrality评估文本的客观性和中立程度
+3. analyze_source_quality评估引用来源的可靠性和多样性
+4. analyze_text_logic评估文本的逻辑连贯性和论证质量
+
+### citation_analysis.py - 引用分析和提取
+
+- `extract_citations()` - 从文本中提取引用内容
+- `get_citation_score()` - 获取引用质量评分
+- `identify_citation_sources()` - 识别引用来源
+
+**工作流程**：
+1. extract_citations使用正则表达式从文本中提取引用内容
+2. identify_citation_sources分析引用的类型和来源
+3. get_citation_score综合评估引用的质量、多样性和可靠性
+
+### citation_validation.py - 引用验证
+
+- `validate_citations()` - 验证文本中引用的真实性
+- `verify_quote_with_searxng()` - 使用搜索引擎验证引用
+
+**工作流程**：
+1. validate_citations从文本中提取引用内容
+2. 对每个引用调用verify_quote_with_searxng进行在线验证
+3. 根据验证结果计算整体引用可靠性评分
+
+### validation.py - 内容交叉验证
+
+- `perform_cross_validation()` - 执行交叉验证，协调整个验证流程
+- `extract_verification_points_with_deepseek()` - 提取需要验证的关键点
+- `verify_search_results_with_deepseek()` - 判断搜索结果与验证点的一致性
+
+**工作流程**：
+1. 使用DeepSeek API提取文本中需要验证的关键点
+2. 针对每个关键点通过SearXNG搜索相关信息
+3. 使用DeepSeek分析搜索结果与关键点的一致性
+4. 综合计算交叉验证的总体评分
+
+### verification.py - 新闻在线验证
+
+- `search_and_verify_news()` - 搜索并验证新闻内容
+- `web_cross_verification()` - 网络交叉验证
+- `local_text_credibility()` - 本地文本可信度分析
+- `check_google_trends()` - 检查Google趋势
+- `evaluate_web_presence()` - 评估网络存在情况
+- `compare_with_similar_news()` - 与类似新闻比较
+
+### service_checker.py - 服务状态检查
+
+- `initialize_services()` - 初始化服务连接
+- `print_service_status()` - 打印服务状态
+- `test_all_services()` - 测试所有服务连接状态
+- `get_service_status_report()` - 获取服务状态报告
+- `check_search_services()` - 检查搜索服务状态
+- `check_ai_services()` - 检查AI服务状态
+
+### result_formatter.py - 分析结果格式化
+
+- `print_formatted_result()` - 格式化打印结果
+- `get_credibility_summary()` - 生成简短的总结性描述
+- `get_rating_emoji()` - 将评分转换为emoji表示和评级
+- `get_progress_bar()` - 生成可视化进度条
+
+**格式化逻辑**：
+result_formatter.py负责将分析结果以结构化、易读的方式呈现给用户，输出采用分级结构，包括总体评分、各维度评分和详细分析。根据评分不同，使用不同颜色和表情符号增强可读性。
+
+### config.py - 配置模块
+
+- `setup_python_path()` - 设置Python路径
+- `setup_logging()` - 配置日志系统
+- `DEFAULT_WEIGHTS` - 默认评分权重
+- `DEEPSEEK_WEIGHTS` - DeepSeek评分权重
+- `init_colorama()` - 初始化彩色输出
+- `load_config()` - 加载配置信息
+- `update_weights()` - 更新权重配置
+
+### web_utils.py - 网络工具
+
+- `get_text_from_url()` - 从URL获取文本内容
+- `evaluate_domain_trust()` - 评估域名可信度
+- `fetch_news_content()` - 获取新闻内容
+- `extract_main_content()` - 提取网页主要内容
+- `detect_paywalls()` - 检测付费墙
+- `clean_html_content()` - 清理HTML内容
+- `get_domain_info()` - 获取域名信息
+- `check_domain_reputation()` - 检查域名声誉
+- `retrieve_webpage_metadata()` - 获取网页元数据
+
+### search_services.py - 搜索服务
+
+- `query_searxng()` - 查询SearXNG搜索引擎
+- `search_with_searxng()` - 使用SearXNG搜索
+- `test_searxng_connection()` - 测试SearXNG连接
+
+**工作流程**：
+1. test_searxng_connection检查搜索服务可用性
+2. search_with_searxng构建查询并发送到SearXNG
+3. query_searxng处理HTTP请求和响应解析
+4. 返回结构化的搜索结果数据
+
+### ai_services.py - AI服务
+
+- `test_deepseek_connection()` - 测试DeepSeek连接
+- `query_deepseek()` - 查询DeepSeek API
+- `analyze_with_deepseek_v3()` - 使用DeepSeek v3分析文本
+
+**analyze_with_deepseek_v3函数工作流程**：
+1. 检查DeepSeek API是否可用
+2. 限制文本长度，避免超出API限制
+3. 构建详细的提示词，要求以JSON格式返回分析结果
+4. 调用query_deepseek函数发送请求
+5. 处理API响应，包括JSON解析和格式化
+6. 多级错误处理和恢复机制：
+   - 首先尝试直接解析整个响应
+   - 如果失败，尝试提取JSON部分
+   - 处理特殊字符和格式问题
+   - 提取结构化数据并标准化
+7. 返回总体评分和详细分析结果
+
+**响应数据结构**：
+DeepSeek分析返回的JSON结构包含：
+- "总体评分"：0-1之间的综合评分
+- "各大类评分"：六个主要维度的评分
+- "细分点评分"：24个细分评分点的评分
+- "AI生成内容"：AI特征分析结果
+- "语言中立性"：语言客观性分析结果
+- "详细分析"：文本整体可信度分析
+- "可信度判断的疑点"：降低可信度的关键问题
+
+### utils.py - 通用工具
+
+- `setup_logging()` - 设置日志
+- `colored()` - 彩色文本输出
+- `get_category_name()` - 获取类别名称
+- `load_environment_variables()` - 加载环境变量
+- `find_common_substrings()` - 查找公共子字符串
+- `format_time()` - 格式化时间
+- `save_json()` - 保存JSON数据
+- `load_json()` - 加载JSON数据
+- `sanitize_filename()` - 净化文件名
+- `create_directory()` - 创建目录
+
+### image_analysis.py - 图像分析
+
+- `check_images()` - 检查图像与文本的一致性
+- `analyze_image_authenticity()` - 分析图像真实性
+- `extract_image_metadata()` - 提取图像元数据
+- `detect_image_manipulation()` - 检测图像操作
+- `analyze_image_quality()` - 分析图像质量
+- `compare_image_with_text()` - 比较图像与文本
+- `get_image_features()` - 获取图像特征
+- `check_image_consistency()` - 检查图像一致性
+
+### test_utils.py - 测试工具
+
+- `simple_test()` - 执行简单功能测试
+- `test_deepseek_connection()` - 测试DeepSeek连接
+- `test_searxng_services()` - 测试SearXNG服务
+- `run_integration_test()` - 运行集成测试
+- `generate_test_report()` - 生成测试报告
+- `benchmark_performance()` - 基准性能测试
+
+### 数据流转图
+
+文本分析流程：
+```
+输入文本/URL → main.py → web_utils.get_text_from_url() → core_analyzer.analyze_news_credibility()
+    ↓
+    调用DeepSeek API (ai_services.analyze_with_deepseek_v3())
+    ↓
+    提取AI生成内容检测、语言中立性等维度数据
+    ↓
+    分析来源质量和引用 (citation_analysis.py)
+    ↓
+    交叉验证 (validation.py + search_services.py)
+    ↓
+    合并所有评分项，计算加权总分
+    ↓
+    格式化结果 (result_formatter.py) → 输出给用户
+```
+
+DeepSeek API调用流程：
+```
+analyze_with_deepseek_v3()
+    ↓
+    构建分析提示词 (包含六大维度和详细评分点)
+    ↓
+    query_deepseek() → DeepSeek API
+    ↓
+    响应解析流程:
+        1. 尝试直接解析完整JSON
+        2. 如果失败，提取可能的JSON部分
+        3. 修复常见JSON格式问题
+        4. 如果仍然失败，使用文本分析提取结构化数据
+    ↓
+    返回总体评分和详细分析结果
+```
+
+数据提取流程：
+```
+AI生成内容检测流程:
+    1. 从DeepSeek结果的"AI生成内容"字段直接提取
+    2. 如失败，从详细分析字段中解析
+    3. 如失败，使用正则表达式从文本中提取
+    4. 如仍失败，使用启发式方法给出默认评分
+
+语言中立性分析流程:
+    1. 从DeepSeek结果的"语言中立性"字段直接提取
+    2. 如失败，从详细分析文本中提取
+    3. 如仍失败，使用本地语言中立性分析算法
+```
+
+### 错误处理和恢复策略
+
+系统实现了多层次的错误处理和恢复策略：
+
+1. **服务可用性检查**：
+   - 在开始分析前检查DeepSeek API和SearXNG的可用性
+   - 根据可用性动态调整分析流程和使用的算法
+
+2. **DeepSeek响应解析**：
+   - 多级解析机制：从标准JSON到提取部分文本
+   - JSON修复：处理格式错误、引号不匹配、中文标点等问题
+   - 在极端情况下尝试使用AST模块解析Python字典
+
+3. **数据提取备选方案**：
+   - 主路径：从结构化JSON中提取
+   - 备选路径1：从详细分析文本中使用正则表达式提取
+   - 备选路径2：基于关键词分析文本内容进行打分
+   - 备选路径3：使用默认值并记录错误
+
+4. **本地算法降级**：
+   - 当在线服务不可用时，使用本地算法进行基础分析
+   - 本地算法包括AI内容检测、语言中立性分析等
+
+5. **缺失项处理**：
+   - 当某项分析失败时，系统会标记该项为"缺失评分项"
+   - 自动调整剩余评分项的权重，确保总分计算合理
+   - 记录详细的错误信息以供调试
+
+6. **异常记录与可追溯性**：
+   - 所有异常均记录详细的堆栈跟踪和上下文信息
+   - 可通过日志追踪整个分析流程中的关键步骤和决策点
+
+### 配置与可定制性
+
+系统提供多种配置选项：
+
+1. **权重配置**：
+   - config.py中的DEFAULT_WEIGHTS：用于本地分析的权重配置
+   - DEEPSEEK_WEIGHTS：使用DeepSeek时的权重配置
+   - 可根据需要动态调整不同维度的权重
+
+2. **API设置**：
+   - DEEPSEEK_API_URL：DeepSeek API的接口地址
+   - DEEPSEEK_API_KEY：API访问密钥
+   - SEARXNG_URL：自托管的SearXNG搜索引擎URL
+
+3. **日志级别**：
+   - DEBUG：最详细的日志，包含所有API调用和响应
+   - INFO：标准信息级别，记录主要流程步骤
+   - WARNING：仅记录警告和错误
+   - ERROR：仅记录错误和异常
+
+4. **分析维度**：
+   - use_ai_services：是否使用AI服务进行分析
+   - use_online：是否使用在线验证服务
+   - 可通过命令行参数或配置文件禁用特定分析维度
+
+5. **输出选项**：
+   - 控制结果输出的详细程度
+   - 支持纯文本、JSON或HTML格式输出
+   - 可选保存结果到本地文件
+
+### 性能优化
+
+系统在性能方面进行了多项优化：
+
+1. **API调用优化**：
+   - 减少重复调用API，合并多项分析为一次调用
+   - 文本长度限制，避免超出API限制
+   - 结果缓存，避免重复分析相同内容
+
+2. **并行处理**：
+   - 支持并行处理多个分析任务
+   - 使用线程池处理多个验证点的搜索
+
+3. **内存优化**：
+   - 避免不必要的大对象复制
+   - 流式处理大文本数据
+
+4. **错误恢复对性能的影响**：
+   - 多级错误恢复机制可能增加处理时间
+   - 提供配置选项控制错误恢复的深度
+
+### 未来扩展方向
+
+系统设计考虑了未来的扩展性：
+
+1. **多API支持**：
+   - 系统架构支持添加更多AI服务提供商
+   - 可实现API切换和负载均衡策略
+
+2. **更多分析维度**：
+   - 情感分析、政治偏向检测
+   - 专业术语和行业特定分析
+
+3. **自定义分析流程**：
+   - 允许用户定义自己的分析流程
+   - 支持插件系统扩展功能
+
+4. **多语言支持**：
+   - 扩展到更多语言的分析
+   - 语言特定的分析规则和评分标准
