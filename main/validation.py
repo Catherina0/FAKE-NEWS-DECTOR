@@ -132,6 +132,15 @@ def perform_cross_validation(text: str, ai_analysis: Dict[str, Any]) -> Dict[str
                     "验证结论": verification_result.get("结论", "无法确定")
                 }
                 
+                # 添加搜索结果链接信息
+                verified_point["搜索结果"] = [
+                    {
+                        "title": r.get("title", ""),
+                        "url": r.get("url", ""),
+                        "content": r.get("content", "")
+                    } for r in search_results.get("results", [])[:3]  # 只保留前3个结果
+                ]
+                
                 # 累加评分
                 importance_weight = 1.0
                 if point.get("重要性", "中") == "高":
@@ -192,6 +201,11 @@ def perform_cross_validation(text: str, ai_analysis: Dict[str, Any]) -> Dict[str
                 result["总体评估"] = "部分可信：交叉验证结果表明部分内容可被证实，但也存在较多无法验证或不一致的信息"
             else:
                 result["总体评估"] = "低度可信：交叉验证结果表明大部分内容无法通过其他来源证实，或与其他来源信息存在较大冲突"
+            
+            # 新增：生成可信内容总结
+            logger.info("生成可信内容总结")
+            verified_content_summary = summarize_verified_content(verified_results)
+            result["可信内容总结"] = verified_content_summary
         else:
             result["验证结论"] = "交叉验证失败，未能验证任何关键点。"
     except Exception as e:
@@ -480,6 +494,8 @@ def verify_search_results_with_deepseek(content: str, doubt_point: str, search_r
     
     # 构建验证提示
     snippets = []
+    result_items = []  # 存储完整的搜索结果信息，包括URL和标题
+    
     if isinstance(search_results, dict) and "results" in search_results:
         search_results_list = search_results.get("results", [])
         for result in search_results_list[:5]:  # 只取前5个结果
@@ -487,18 +503,31 @@ def verify_search_results_with_deepseek(content: str, doubt_point: str, search_r
                 snippet = result.get("content", result.get("snippet", ""))
                 if snippet:
                     snippets.append(snippet)
+                    # 收集完整的结果信息
+                    result_items.append({
+                        "title": result.get("title", ""),
+                        "url": result.get("url", ""),
+                        "content": snippet
+                    })
     elif isinstance(search_results, list):
         for result in search_results[:5]:
             if isinstance(result, dict):
                 snippet = result.get("content", result.get("snippet", ""))
                 if snippet:
                     snippets.append(snippet)
+                    # 收集完整的结果信息
+                    result_items.append({
+                        "title": result.get("title", ""),
+                        "url": result.get("url", ""),
+                        "content": snippet
+                    })
     
     if not snippets:
         logger.warning("搜索结果中没有可用的摘要信息")
         return {
             "评分": 0.4,
-            "结论": "未能找到足够的相关信息进行验证"
+            "结论": "未能找到足够的相关信息进行验证",
+            "搜索结果": []  # 确保结果中包含搜索结果字段，即使为空
         }
     
     # 构建搜索结果文本
@@ -544,15 +573,15 @@ def verify_search_results_with_deepseek(content: str, doubt_point: str, search_r
                     verification_result = json.loads(json_match.group(0))
                 except:
                     logger.error("无法解析DeepSeek返回的JSON格式验证结果")
-                    return generate_default_verification_result(doubt_point, snippets)
+                    return generate_default_verification_result(doubt_point, snippets, result_items)
             else:
                 logger.error("DeepSeek响应中未找到JSON格式的验证结果")
-                return generate_default_verification_result(doubt_point, snippets)
+                return generate_default_verification_result(doubt_point, snippets, result_items)
         
         # 验证返回的格式是否正确
         if not isinstance(verification_result, dict):
             logger.error("DeepSeek返回的验证结果不是字典格式")
-            return generate_default_verification_result(doubt_point, snippets)
+            return generate_default_verification_result(doubt_point, snippets, result_items)
         
         if "评分" not in verification_result:
             logger.error("DeepSeek返回的验证结果中缺少'评分'字段")
@@ -573,19 +602,23 @@ def verify_search_results_with_deepseek(content: str, doubt_point: str, search_r
         score = max(0.0, min(1.0, score))
         verification_result["评分"] = score
         
+        # 添加搜索结果信息到验证结果中
+        verification_result["搜索结果"] = result_items
+        
         return verification_result
     except Exception as e:
         logger.error(f"验证搜索结果时出错: {e}")
         logger.error(traceback.format_exc())
-        return generate_default_verification_result(doubt_point, snippets)
+        return generate_default_verification_result(doubt_point, snippets, result_items)
 
-def generate_default_verification_result(doubt_point: str, snippets: List[str]) -> Dict[str, Any]:
+def generate_default_verification_result(doubt_point: str, snippets: List[str], result_items: List[Dict[str, str]] = None) -> Dict[str, Any]:
     """
     当DeepSeek API验证失败时，生成默认验证结果
     
     参数:
         doubt_point (str): 需要验证的关键点
         snippets (List[str]): 搜索结果摘要列表
+        result_items (List[Dict[str, str]]): 完整的搜索结果信息
     
     返回:
         Dict[str, Any]: 默认验证结果
@@ -602,12 +635,111 @@ def generate_default_verification_result(doubt_point: str, snippets: List[str]) 
         
         match_score = min(1.0, match_count / len(snippets)) if snippets else 0.5
         
-        return {
+        result = {
             "评分": max(0.4, match_score),
             "结论": "系统通过简单关键词匹配进行评估，结果可能不够精确"
         }
     else:
-        return {
+        result = {
             "评分": 0.3,
             "结论": "未找到足够的相关信息进行验证，且AI验证失败"
-        } 
+        }
+    
+    # 添加搜索结果信息
+    if result_items:
+        result["搜索结果"] = result_items
+    else:
+        result["搜索结果"] = []
+    
+    return result
+
+def summarize_verified_content(verification_points: List[Dict[str, Any]]) -> str:
+    """
+    使用DeepSeek总结经过验证的、可信度较高的内容
+    
+    参数:
+        verification_points (List[Dict[str, Any]]): 验证点列表
+    
+    返回:
+        str: 可信内容的总结
+    """
+    from ai_services import query_deepseek
+    
+    logger.info("开始总结验证内容")
+    
+    # 收集高可信度验证点的搜索结果
+    verified_snippets = []
+    for point in verification_points:
+        # 只选择可信度较高的验证点(评分大于等于0.7)
+        if point.get("验证评分", 0) >= 0.7:
+            # 获取该验证点的内容
+            content = point.get("验证内容", "")
+            if content:
+                verified_snippets.append(content)
+            
+            # 获取该验证点的搜索结果内容
+            if "搜索结果" in point and isinstance(point["搜索结果"], list):
+                for result in point["搜索结果"]:
+                    if isinstance(result, dict) and "content" in result:
+                        verified_snippets.append(result["content"])
+            
+            # 获取该验证点的搜索结果摘要
+            if "搜索结果摘要" in point and isinstance(point["搜索结果摘要"], list):
+                verified_snippets.extend(point["搜索结果摘要"])
+    
+    # 如果没有找到高可信度的验证点，则使用所有验证点
+    if not verified_snippets:
+        logger.warning("未找到高可信度验证点，使用所有验证点")
+        for point in verification_points:
+            content = point.get("验证内容", "")
+            if content:
+                verified_snippets.append(content)
+            
+            if "搜索结果" in point and isinstance(point["搜索结果"], list):
+                for result in point["搜索结果"]:
+                    if isinstance(result, dict) and "content" in result:
+                        verified_snippets.append(result["content"])
+            
+            if "搜索结果摘要" in point and isinstance(point["搜索结果摘要"], list):
+                verified_snippets.extend(point["搜索结果摘要"])
+    
+    # 如果仍然没有找到任何内容，返回默认消息
+    if not verified_snippets:
+        logger.error("没有找到可用于总结的内容")
+        return "未找到可信内容，无法生成总结。"
+    
+    # 合并所有片段
+    combined_text = "\n\n".join(verified_snippets)
+    
+    # 如果内容太长，取前2000个字符
+    if len(combined_text) > 2000:
+        combined_text = combined_text[:2000]
+    
+    # 构建DeepSeek提示
+    prompt = f"""
+    请根据以下经过交叉验证的内容，生成一个不超过200字的简洁总结，告诉用户这些内容中确认的事实是什么：
+    
+    {combined_text}
+    
+    请直接给出总结，不要包含引言或其他额外解释。总结应该客观准确，只包含经过验证的事实。
+    """
+    
+    try:
+        # 调用DeepSeek API生成总结
+        response = query_deepseek(prompt)
+        
+        # 处理响应
+        summary = response.strip()
+        
+        # 限制总结字数
+        if len(summary) > 200:
+            logger.warning(f"总结超过200字({len(summary)}字)，将被截断")
+            # 保留前200个字符并在末尾添加省略号
+            summary = summary[:197] + "..."
+        
+        logger.info(f"成功生成总结，长度: {len(summary)}字")
+        return summary
+    except Exception as e:
+        logger.error(f"生成总结时出错: {e}")
+        logger.error(traceback.format_exc())
+        return "尝试生成内容总结时出错，请查看可信度分析各部分的详细内容。" 

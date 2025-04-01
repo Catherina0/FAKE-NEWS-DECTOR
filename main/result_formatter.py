@@ -1237,6 +1237,26 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                     print(f"\n{SECTION_COLOR}验证点分析:{RESET_COLOR}")
                     for i, point in enumerate(verification_points, 1):
                         if isinstance(point, dict):
+                            # 检查是否包含key_points键，如果包含则说明是多个验证点的集合
+                            if "key_points" in point and isinstance(point["key_points"], list):
+                                for j, sub_point in enumerate(point["key_points"], 1):
+                                    # 获取内容
+                                    if isinstance(sub_point, dict) and "内容" in sub_point:
+                                        content = sub_point["内容"]
+                                        importance = sub_point.get("重要性", "中")
+                                        score_color = SUCCESS_COLOR if "验证评分" in point and point["验证评分"] >= 0.7 else (WARNING_COLOR if "验证评分" in point and point["验证评分"] >= 0.5 else ERROR_COLOR)
+                                        print(f"{score_color}  • 验证点 {i}.{j}: {content}{RESET_COLOR}")
+                                        if "验证评分" in point:
+                                            print(f"{score_color}    得分: {point['验证评分']:.2f} {get_progress_bar(point['验证评分'])}{RESET_COLOR}")
+                                        
+                                        # 显示重要性
+                                        print(f"{DETAIL_COLOR}    重要性: {importance}{RESET_COLOR}")
+                                        
+                                        # 如果有验证结论，显示它
+                                        if "验证结论" in point and point["验证结论"]:
+                                            print(f"{DETAIL_COLOR}    结论: {point['验证结论']}{RESET_COLOR}")
+                                continue
+                            
                             # 获取内容，尝试多个可能的键名
                             content = None
                             for content_key in ["内容", "验证内容", "content", "claim", "statement"]:
@@ -1275,6 +1295,49 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                                     print(f"{WARNING_COLOR}    搜索结果: 未找到相关内容{RESET_COLOR}")
                                 else:
                                     print(f"{DETAIL_COLOR}    搜索结果: {result_count}个相关内容{RESET_COLOR}")
+                                    
+                            # 显示搜索结果链接和摘要
+                            if "搜索结果摘要" in point and point["搜索结果摘要"]:
+                                print(f"{DETAIL_COLOR}    相关信息摘要:{RESET_COLOR}")
+                                for j, summary in enumerate(point["搜索结果摘要"], 1):
+                                    if summary:
+                                        # 摘要限制在100字符以内，显示为间断摘要
+                                        if len(summary) > 100:
+                                            formatted_summary = summary[:40] + "..." + summary[len(summary)-40:]
+                                        else:
+                                            formatted_summary = summary
+                                        print(f"{DETAIL_COLOR}      {j}. {formatted_summary}{RESET_COLOR}")
+                            
+                            # 获取搜索结果链接
+                            search_results = None
+                            for results_key in ["search_results", "搜索结果", "results", "相关信息"]:
+                                if results_key in point and point[results_key]:
+                                    search_results = point[results_key]
+                                    break
+                            
+                            # 如果找到了搜索结果链接，显示它们
+                            if search_results and isinstance(search_results, list):
+                                print(f"{DETAIL_COLOR}    相关链接:{RESET_COLOR}")
+                                for j, result_item in enumerate(search_results[:3], 1):  # 限制显示3个链接
+                                    if isinstance(result_item, dict):
+                                        url = result_item.get("url", "")
+                                        title = result_item.get("title", "未知标题")
+                                        print(f"{DETAIL_COLOR}      {j}. {title}{RESET_COLOR}")
+                                        print(f"{INFO_COLOR}         {url}{RESET_COLOR}")
+                                        
+                                        # 如果有内容摘要，显示间断摘要
+                                        content = result_item.get("content", "")
+                                        if content:
+                                            if len(content) > 100:
+                                                formatted_content = content[:40] + "..." + content[len(content)-40:]
+                                            else:
+                                                formatted_content = content
+                                            print(f"{NEUTRAL_COLOR}         摘要: {formatted_content}{RESET_COLOR}")
+                                    elif isinstance(result_item, str) and ("http://" in result_item or "https://" in result_item):
+                                        print(f"{INFO_COLOR}      {j}. {result_item}{RESET_COLOR}")
+                                
+                                if len(search_results) > 3:
+                                    print(f"{DETAIL_COLOR}      ... 等共 {len(search_results)} 个相关链接{RESET_COLOR}")
                 else:
                     # 如果没有验证点但已通过测试验证了SearXNG可用，显示提示信息
                     print(f"\n{WARNING_COLOR}  • 未能成功提取验证点，但搜索服务正常{RESET_COLOR}")
@@ -1303,6 +1366,13 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                 # 显示时效性
                 timeliness = cross_validation_data.get("timeliness", cross_validation_data.get("时效性", "未知"))
                 print(f"{DETAIL_COLOR}  • 时效性评估: {timeliness}{RESET_COLOR}")
+                
+                # 显示可信内容总结 (新增部分)
+                if "可信内容总结" in cross_validation_data and cross_validation_data["可信内容总结"]:
+                    print(f"\n{SECTION_COLOR}可信内容总结:{RESET_COLOR}")
+                    summary = cross_validation_data["可信内容总结"]
+                    # 使用醒目颜色显示总结
+                    print(f"{SUCCESS_COLOR}  {summary}{RESET_COLOR}")
                 
                 # 显示问题点 - 修改此部分
                 # 计算验证点中无结果的数量和来源数量
