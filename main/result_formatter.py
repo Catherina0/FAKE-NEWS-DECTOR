@@ -331,12 +331,14 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
         # 如果维度太少，降低整体可信度
         confidence_penalty = 0.15  # 对最终评分应用15%的降低
         
-        # 仅当有足够的信息计算最终评分时才应用
+        # 仅当有足够的信息计算最终评分时才标记应用惩罚
         if total_weight > 0:
-            final_score = weighted_sum / total_weight
-            final_score = max(0.3, final_score * (1 - confidence_penalty))
-            logger.info(f"由于关键维度缺失，将评分从 {weighted_sum/total_weight:.2f} 降低至 {final_score:.2f}")
-            return final_score, used_weights
+            missing_critical_dimensions = True
+            logger.info(f"标记关键维度缺失，后续将应用 {confidence_penalty*100:.0f}% 的惩罚")
+        else:
+            missing_critical_dimensions = False
+    else:
+        missing_critical_dimensions = False
     
     # 如果没有有效的评分项，但有交叉验证数据
     if total_weight == 0 and cross_validation_data:
@@ -388,12 +390,20 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
     # 计算最终得分
     final_score = weighted_sum / total_weight
     
+    # 应用关键维度缺失惩罚（如果之前标记需要）
+    if missing_critical_dimensions:
+        confidence_penalty = 0.15  # 对最终评分应用15%的降低
+        original_score = final_score
+        final_score = max(0.3, final_score * (1 - confidence_penalty))
+        logger.info(f"由于关键维度缺失，将评分从 {original_score:.2f} 降低至 {final_score:.2f}")
+    
     # 调整因子：基于维度的完整性进行轻微调整
-    coverage_ratio = len(dimension_scores) / (len(base_weights) - (0 if cross_validation_score is not None else 1))
+    coverage_ratio = len(dimension_scores) / (len(base_weights) - (1 if cross_validation_score is None else 0))
     if coverage_ratio < 0.7:  # 如果维度覆盖不足70%
         coverage_penalty = 0.05 * (1 - coverage_ratio)  # 最多5%的惩罚
+        original_score = final_score
         final_score = max(0.3, final_score * (1 - coverage_penalty))
-        logger.debug(f"由于维度覆盖率低({coverage_ratio:.2f})，评分从 {weighted_sum/total_weight:.2f} 调整为 {final_score:.2f}")
+        logger.debug(f"由于维度覆盖率低({coverage_ratio:.2f})，评分从 {original_score:.2f} 调整为 {final_score:.2f}")
     
     logger.info(f"计算得到加权总分: {final_score:.2f} (原始加权平均: {weighted_sum/total_weight:.2f})")
     return final_score, used_weights
