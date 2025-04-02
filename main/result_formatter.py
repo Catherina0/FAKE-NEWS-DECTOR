@@ -155,41 +155,64 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
     返回:
         Tuple[float, dict]: (加权总分, 各维度权重)
     """
-    # 定义各维度的权重（总和为0.7，为交叉验证预留0.3）
-    weights = {
-        "内容真实性": 0.15,  # 
-        "信息准确性": 0.15,  #
-        "来源可靠性": 0.15,  #
-        "引用质量": 0.10,    #
-        "语言客观性": 0.08,  #
-        "逻辑连贯性": 0.07,  
-        "交叉验证": 0.30     # 新增交叉验证权重
+    # 基础维度权重 - 按优先级排序
+    base_weights = {
+        "内容真实性": 0.20,  # 提高真实性权重
+        "信息准确性": 0.20,  # 提高准确性权重
+        "来源可靠性": 0.15,  # 
+        "引用质量": 0.12,    # 略微提高引用质量的权重
+        "语言客观性": 0.08,  # 
+        "逻辑连贯性": 0.05,  # 降低连贯性权重（相对不那么重要）
+        "交叉验证": 0.20     # 降低交叉验证权重，避免其过度影响结果
     }
+    
+    # 确保权重总和为1.0
+    weight_sum = sum(base_weights.values())
+    if weight_sum != 1.0:
+        correction_factor = 1.0 / weight_sum
+        base_weights = {k: v * correction_factor for k, v in base_weights.items()}
     
     total_weight = 0
     weighted_sum = 0
     used_weights = {}
+    dimension_scores = {}  # 记录每个维度的实际使用分数
     
     # 记录输入数据，帮助调试
     logger.debug(f"计算加权分数 - 主要评分: {main_scores}")
     logger.debug(f"计算加权分数 - 交叉验证数据: {cross_validation_data}")
     
+    # 定义关键维度 - 如果这些维度全部缺失，则质量评估不可靠
+    critical_dimensions = ["内容真实性", "信息准确性", "来源可靠性"]
+    critical_count = 0
+    
     # 处理主要维度评分
-    for dimension, weight in weights.items():
+    for dimension, weight in base_weights.items():
         if dimension == "交叉验证":
             continue  # 跳过交叉验证，稍后处理
+        
         if dimension in main_scores:
             try:
                 score = validate_score(main_scores[dimension], f"维度评分.{dimension}")
+                
+                # 确保分数在有效范围内
+                score = max(0.0, min(1.0, score))
+                
+                # 记录关键维度数量
+                if dimension in critical_dimensions:
+                    critical_count += 1
+                
+                # 计算加权分数
                 weighted_sum += score * weight
                 total_weight += weight
                 used_weights[dimension] = weight
+                dimension_scores[dimension] = score
                 logger.debug(f"{dimension} 评分: {score:.2f}, 权重: {weight}")
             except ValueError:
                 logger.warning(f"跳过无效的评分项: {dimension}")
                 continue
     
     # 处理交叉验证评分
+    cross_validation_score = None
     if cross_validation_data and isinstance(cross_validation_data, dict):
         try:
             # 首先尝试直接使用score字段
@@ -197,75 +220,163 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
                 cross_validation_score = validate_score(cross_validation_data["score"], "交叉验证.score")
                 logger.debug(f"使用交叉验证直接提供的评分: {cross_validation_score}")
             else:
-                # 如果没有score字段，尝试从其他字段推断
-                cross_validation_score = 0.0
+                # 如果没有score字段，尝试从多个字段计算综合得分
+                scores_to_combine = []
                 
                 # 从一致性数据中提取
-                consistency = cross_validation_data.get("consistency", cross_validation_data.get("一致性", 0))
-                if consistency:
+                consistency = cross_validation_data.get("consistency", cross_validation_data.get("一致性", None))
+                if consistency is not None:
                     try:
                         if isinstance(consistency, str) and "%" in consistency:
-                            # 处理百分比字符串
                             consistency = float(consistency.strip("%")) / 100
                         else:
                             consistency = float(consistency)
-                        cross_validation_score = consistency
-                        logger.debug(f"从一致性数据中提取交叉验证评分: {cross_validation_score}")
+                        scores_to_combine.append(consistency)
+                        logger.debug(f"从一致性数据提取评分: {consistency:.2f}")
                     except (ValueError, TypeError):
                         logger.warning(f"无法从一致性数据中提取评分: {consistency}")
                 
                 # 从来源可信度中提取
-                if cross_validation_score == 0.0:
-                    source_credibility = cross_validation_data.get("source_credibility", cross_validation_data.get("来源可信度", ""))
-                    if isinstance(source_credibility, str):
+                source_credibility = cross_validation_data.get("source_credibility", cross_validation_data.get("来源可信度", None))
+                if source_credibility is not None:
+                    credibility_score = 0.5  # 默认中等可信度
+                    
+                    if isinstance(source_credibility, (int, float)):
+                        credibility_score = float(source_credibility)
+                    elif isinstance(source_credibility, str):
                         if "高度可信" in source_credibility:
-                            cross_validation_score = 0.9
+                            credibility_score = 0.9
                         elif "可信" in source_credibility:
-                            cross_validation_score = 0.7
+                            credibility_score = 0.7
                         elif "部分可信" in source_credibility:
-                            cross_validation_score = 0.5
+                            credibility_score = 0.5
                         elif "低可信" in source_credibility:
-                            cross_validation_score = 0.3
+                            credibility_score = 0.3
                         else:
-                            cross_validation_score = 0.1
-                        logger.debug(f"从source_credibility提取交叉验证评分: {cross_validation_score}")
+                            credibility_score = 0.2
+                    
+                    scores_to_combine.append(credibility_score)
+                    logger.debug(f"从来源可信度提取评分: {credibility_score:.2f}")
+                
+                # 从验证结果中提取
+                verification_score = cross_validation_data.get("verification_score", cross_validation_data.get("验证分数", None))
+                if verification_score is not None:
+                    try:
+                        v_score = float(verification_score)
+                        scores_to_combine.append(v_score)
+                        logger.debug(f"从验证结果提取评分: {v_score:.2f}")
+                    except (ValueError, TypeError):
+                        pass
+                
+                # 计算综合得分
+                if scores_to_combine:
+                    # 使用加权平均，最近添加的分数权重更高
+                    weights = [0.5 + (i * 0.5 / len(scores_to_combine)) for i in range(len(scores_to_combine))]
+                    weight_sum = sum(weights)
+                    cross_validation_score = sum(s * w for s, w in zip(scores_to_combine, weights)) / weight_sum
+                    logger.debug(f"从多个字段计算的综合交叉验证评分: {cross_validation_score:.2f}")
             
             # 考虑来源数量影响评分
-            source_count = cross_validation_data.get("source_count", 0)
-            if source_count > 5:
-                cross_validation_score = min(1.0, cross_validation_score * 1.2)
-                logger.debug(f"来源数量较多，提升评分至: {cross_validation_score}")
-            elif source_count < 2:
-                cross_validation_score = cross_validation_score * 0.8
-                logger.debug(f"来源数量较少，降低评分至: {cross_validation_score}")
-            logger.debug(f"考虑来源数量后的交叉验证评分: {cross_validation_score}")
+            if cross_validation_score is not None:
+                source_count = cross_validation_data.get("source_count", 0)
+                if source_count > 5:
+                    boost_factor = min(1.2, 1.0 + (source_count - 5) * 0.03)  # 最多提升20%
+                    cross_validation_score = min(1.0, cross_validation_score * boost_factor)
+                    logger.debug(f"来源数量较多({source_count})，提升评分至: {cross_validation_score:.2f}")
+                elif source_count < 2:
+                    cross_validation_score = cross_validation_score * 0.9  # 降低10%
+                    logger.debug(f"来源数量较少({source_count})，降低评分至: {cross_validation_score:.2f}")
             
-            # 创建一个至少0.4的默认得分，避免无效评分
-            if cross_validation_score <= 0:
-                cross_validation_score = 0.4
-                logger.warning(f"交叉验证评分无效或过低，使用默认值: {cross_validation_score}")
+            # 确保交叉验证评分有一个合理的值
+            if cross_validation_score is None or cross_validation_score <= 0:
+                # 使用主要维度评分的平均值作为默认值
+                if dimension_scores:
+                    cross_validation_score = sum(dimension_scores.values()) / len(dimension_scores)
+                    cross_validation_score = max(0.4, min(0.7, cross_validation_score))  # 限制在0.4-0.7范围内
+                else:
+                    cross_validation_score = 0.5  # 默认中等分数
+                
+                logger.warning(f"交叉验证评分无效或缺失，使用估算值: {cross_validation_score:.2f}")
             
-            weighted_sum += cross_validation_score * weights["交叉验证"]
-            total_weight += weights["交叉验证"]
-            used_weights["交叉验证"] = weights["交叉验证"]
-            logger.debug(f"交叉验证评分: {cross_validation_score:.2f}, 权重: {weights['交叉验证']}")
+            # 将交叉验证评分纳入总分计算
+            weighted_sum += cross_validation_score * base_weights["交叉验证"]
+            total_weight += base_weights["交叉验证"]
+            used_weights["交叉验证"] = base_weights["交叉验证"]
+            dimension_scores["交叉验证"] = cross_validation_score
+            logger.debug(f"交叉验证评分: {cross_validation_score:.2f}, 权重: {base_weights['交叉验证']}")
+            
         except Exception as e:
             logger.warning(f"处理交叉验证评分时出错: {str(e)}")
-            # 使用默认评分
-            cross_validation_score = 0.5
-            logger.info(f"交叉验证处理失败，使用默认评分: {cross_validation_score}")
-            weighted_sum += cross_validation_score * weights["交叉验证"]
-            total_weight += weights["交叉验证"]
-            used_weights["交叉验证"] = weights["交叉验证"]
+            # 使用更可靠的默认评分方法
+            try:
+                # 如果有其他维度评分，使用它们的平均值
+                if dimension_scores:
+                    cross_validation_score = sum(dimension_scores.values()) / len(dimension_scores)
+                    cross_validation_score = max(0.4, min(0.7, cross_validation_score))  # 限制在0.4-0.7范围内
+                else:
+                    cross_validation_score = 0.5  # 默认中等分数
+                
+                logger.info(f"交叉验证处理失败，使用估算评分: {cross_validation_score:.2f}")
+                weighted_sum += cross_validation_score * base_weights["交叉验证"]
+                total_weight += base_weights["交叉验证"]
+                used_weights["交叉验证"] = base_weights["交叉验证"]
+                dimension_scores["交叉验证"] = cross_validation_score
+            except Exception as inner_e:
+                logger.error(f"处理交叉验证评分的备选方法也失败: {str(inner_e)}")
+    
+    # 检查是否缺少过多关键维度
+    if critical_count < len(critical_dimensions) / 2:
+        logger.warning(f"缺少大部分关键维度评分项 (仅有 {critical_count}/{len(critical_dimensions)})")
+        
+        # 如果维度太少，降低整体可信度
+        confidence_penalty = 0.15  # 对最终评分应用15%的降低
+        
+        # 仅当有足够的信息计算最终评分时才应用
+        if total_weight > 0:
+            final_score = weighted_sum / total_weight
+            final_score = max(0.3, final_score * (1 - confidence_penalty))
+            logger.info(f"由于关键维度缺失，将评分从 {weighted_sum/total_weight:.2f} 降低至 {final_score:.2f}")
+            return final_score, used_weights
     
     # 如果没有有效的评分项，但有交叉验证数据
     if total_weight == 0 and cross_validation_data:
         logger.warning("主要评分项为空，尝试单独使用交叉验证数据")
         try:
-            # 尝试从交叉验证中提取评分
-            if hasattr(cross_validation_data, 'get'):
-                cv_score = cross_validation_data.get('score', 0.7)  # 默认使用0.7
-                return float(cv_score), {"交叉验证": 1.0}
+            # 首先尝试提取score字段
+            if isinstance(cross_validation_data, dict) and cross_validation_data.get('score') is not None:
+                cv_score = float(cross_validation_data.get('score'))
+                cv_score = max(0.3, min(0.8, cv_score))  # 限制范围
+                logger.info(f"仅使用交叉验证评分: {cv_score:.2f}")
+                return cv_score, {"交叉验证": 1.0}
+            
+            # 其次尝试综合推断
+            if isinstance(cross_validation_data, dict):
+                # 评估来源数量和可信度来推断评分
+                source_count = cross_validation_data.get('source_count', 0)
+                source_credibility = cross_validation_data.get('source_credibility', '')
+                
+                # 基于可用信息推断评分
+                base_score = 0.5  # 默认中等分数
+                
+                # 来源数量调整
+                if source_count > 3:
+                    base_score += min(0.2, (source_count - 3) * 0.04)  # 每增加一个来源提高0.04，最多提高0.2
+                elif source_count < 2:
+                    base_score -= 0.1  # 来源少于2个，降低0.1
+                
+                # 可信度调整
+                if isinstance(source_credibility, str):
+                    if "高度可信" in source_credibility:
+                        base_score += 0.2
+                    elif "可信" in source_credibility:
+                        base_score += 0.1
+                    elif "低可信" in source_credibility:
+                        base_score -= 0.1
+                
+                # 确保在合理范围内
+                inferred_score = max(0.3, min(0.8, base_score))
+                logger.info(f"从交叉验证数据推断评分: {inferred_score:.2f}")
+                return inferred_score, {"交叉验证": 1.0}
         except Exception as e:
             logger.error(f"尝试使用交叉验证数据失败: {str(e)}")
     
@@ -274,14 +385,18 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
         logger.warning("没有有效评分项，返回None")
         return None, {}
     
-    # 重新归一化权重
-    if total_weight < 1.0:
-        normalization_factor = 1.0 / total_weight
-        weighted_sum *= normalization_factor
-        used_weights = {k: v * normalization_factor for k, v in used_weights.items()}
+    # 计算最终得分
+    final_score = weighted_sum / total_weight
     
-    logger.info(f"计算得到加权总分: {weighted_sum:.2f}")
-    return weighted_sum, used_weights
+    # 调整因子：基于维度的完整性进行轻微调整
+    coverage_ratio = len(dimension_scores) / (len(base_weights) - (0 if cross_validation_score is not None else 1))
+    if coverage_ratio < 0.7:  # 如果维度覆盖不足70%
+        coverage_penalty = 0.05 * (1 - coverage_ratio)  # 最多5%的惩罚
+        final_score = max(0.3, final_score * (1 - coverage_penalty))
+        logger.debug(f"由于维度覆盖率低({coverage_ratio:.2f})，评分从 {weighted_sum/total_weight:.2f} 调整为 {final_score:.2f}")
+    
+    logger.info(f"计算得到加权总分: {final_score:.2f} (原始加权平均: {weighted_sum/total_weight:.2f})")
+    return final_score, used_weights
 
 def analyze_problems(result: dict, total_score: float, main_scores: dict, cross_validation_data: dict) -> list:
     """
@@ -624,6 +739,53 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
         
         print(f"{TITLE_COLOR}{f'评级区间: {rating_explanation}':^70}{RESET_COLOR}")
         print(f"{TITLE_COLOR}{'▓' * 70}{RESET_COLOR}")
+        
+        # 添加评分权重和贡献明细
+        if weights and isinstance(weights, dict) and total_score_pct > 0:
+            print(f"\n{SECTION_COLOR}评分构成分析:{RESET_COLOR}")
+            
+            # 准备维度排序和显示
+            dimension_display = {
+                "内容真实性": "内容的真实准确程度",
+                "信息准确性": "信息与事实的一致性",
+                "来源可靠性": "信息来源的权威性",
+                "引用质量": "引用来源的质量",
+                "语言客观性": "语言表达的客观程度",
+                "逻辑连贯性": "内容的逻辑性",
+                "交叉验证": "外部信息的验证确认"
+            }
+            
+            # 按照权重从大到小排序
+            sorted_weights = sorted(weights.items(), key=lambda x: x[1], reverse=True)
+            
+            for dimension, weight in sorted_weights:
+                if dimension in main_scores:
+                    # 计算该维度对总分的贡献
+                    score = float(main_scores[dimension])
+                    contribution = score * weight * 100 / total_score_pct  # 贡献比例
+                    
+                    # 根据贡献大小设置颜色
+                    color = SUCCESS_COLOR if contribution >= 25 else (DETAIL_COLOR if contribution >= 15 else NEUTRAL_COLOR)
+                    
+                    # 显示维度评分和贡献
+                    dimension_desc = dimension_display.get(dimension, dimension)
+                    print(f"{color}  • {dimension}: {score:.2f} × 权重{weight:.2f} = {score*weight:.2f} (贡献{contribution:.1f}%){RESET_COLOR}")
+                    print(f"{NEUTRAL_COLOR}    - {dimension_desc}{RESET_COLOR}")
+                elif dimension == "交叉验证" and "交叉验证" in weights:
+                    # 交叉验证可能没有在main_scores中，但有权重
+                    cv_score = 0.0
+                    # 尝试从交叉验证数据中提取分数
+                    if cross_validation_data and isinstance(cross_validation_data, dict) and "score" in cross_validation_data:
+                        cv_score = float(cross_validation_data["score"])
+                    else:
+                        # 使用推导的分数 (总分乘以权重比例)
+                        cv_score = total_score * weight
+                    
+                    contribution = cv_score * weight * 100 / total_score_pct
+                    color = SUCCESS_COLOR if contribution >= 25 else (DETAIL_COLOR if contribution >= 15 else NEUTRAL_COLOR)
+                    
+                    print(f"{color}  • 交叉验证: {cv_score:.2f} × 权重{weight:.2f} = {cv_score*weight:.2f} (贡献{contribution:.1f}%){RESET_COLOR}")
+                    print(f"{NEUTRAL_COLOR}    - 外部信息的验证确认{RESET_COLOR}")
         
         # 获取摘要
         summary = get_credibility_summary(total_score)
