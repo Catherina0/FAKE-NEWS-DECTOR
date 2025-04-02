@@ -860,144 +860,95 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                         print(f"{DETAIL_COLOR}  • 原始AI生成内容数据: {str(ai_content_data)[:200]}...{RESET_COLOR}")
                     except:
                         pass
-        else:
-            # 尝试从deepseek_data中提取AI内容相关信息
-            ai_related_info = {}
-            if isinstance(deepseek_data, dict):
-                # 搜索deepseek_data中可能与AI相关的键
-                for key, value in deepseek_data.items():
-                    if any(term in key.lower() for term in ["ai", "人工智能", "生成", "机器"]):
-                        ai_related_info[key] = value
-            
-            if ai_related_info:
-                print(f"{WARNING_COLOR}  • 未找到标准格式的AI生成内容检测数据，但发现相关信息{RESET_COLOR}")
-                print(f"{DETAIL_COLOR}  • 相关信息: {str(ai_related_info)[:200]}...{RESET_COLOR}")
-            else:
-                print(f"{WARNING_COLOR}  • 未找到AI生成内容检测数据{RESET_COLOR}")
-                print(f"{DETAIL_COLOR}  • 建议：启用AI生成内容检测功能以评估文本真实性{RESET_COLOR}")
         
-        # 2. 安全获取和处理 DeepSeek 数据
-        logger.debug("开始处理DeepSeek分析数据")
-        deepseek_data = result.get("原始分析数据", {}).get("deepseek_full_response", {})
-        if not isinstance(deepseek_data, dict):
-            logger.warning("DeepSeek数据格式无效")
-            deepseek_data = {}
+        # 2. 引用分析处理
+        logger.debug("开始处理引用分析数据")
+        print(f"\n{SECTION_COLOR}1. 引用质量分析:{RESET_COLOR}")
         
-        # 3. 处理主要评分
-        logger.debug("开始处理主要评分指标")
-        main_scores = {}
+        # 尝试从不同位置获取引用数据
+        citation_data = None
         
-        # 首先尝试从评分详情中获取
-        if isinstance(scoring_details, dict):
-            for key, value in scoring_details.items():
-                if key.startswith(("内容真实性", "信息准确性", "来源可靠性", "引用质量", "语言客观性", "逻辑连贯性")):
-                    clean_key = key.split("_")[-1] if "_" in key else key
-                    try:
-                        main_scores[clean_key] = validate_score(value, f"评分详情.{key}")
-                        logger.debug(f"从评分详情获取到{clean_key}评分: {main_scores[clean_key]}")
-                    except ValueError:
-                        logger.warning(f"评分详情中的{key}评分无效: {value}")
-                        continue
+        # 尝试获取新格式的引用验证结果
+        citation_validation_data = result.get("引用验证结果", {})
         
-        # 如果评分详情中没有找到，则从deepseek数据中获取
-        if not main_scores:
-            logger.debug("尝试从DeepSeek数据获取主要评分")
-            main_scores = deepseek_data.get("各大类评分", {})
+        # 先检查引用验证结果
+        if citation_validation_data:
+            logger.info("使用引用验证结果作为引用分析数据")
+            citation_data = citation_validation_data
         
-        if main_scores and isinstance(main_scores, dict):
-            print(f"\n{SECTION_COLOR}2. 主要评分指标:{RESET_COLOR}")
-            try:
-                # 处理主要维度评分
-                dimensions = {
-                    "内容真实性": "新闻内容与事实的符合程度",
-                    "信息准确性": "信息的精确性和完整性",
-                    "来源可靠性": "信息来源的权威性和可信度",
-                    "引用质量": "引用的准确性和相关性",
-                    "语言客观性": "语言表达的中立性和客观性",
-                    "逻辑连贯性": "内容的逻辑性和连贯性"
-                }
-                
-                for dim, desc in dimensions.items():
-                    score = main_scores.get(dim)
-                    if score is not None:
-                        try:
-                            score_float = validate_score(score, f"主要评分.{dim}")
-                            color = SUCCESS_COLOR if score_float >= 0.8 else (WARNING_COLOR if score_float >= 0.6 else ERROR_COLOR)
-                            print(f"{color}  • {dim}: {score_float:.2f} {get_progress_bar(score_float)}{RESET_COLOR}")
-                            print(f"{DETAIL_COLOR}    - {desc}{RESET_COLOR}")
-                            logger.debug(f"{dim}评分: {score_float:.2f}")
-                        except ValueError:
-                            logger.warning(f"{dim}评分无效: {score}")
-                            print(f"{ERROR_COLOR}  • {dim}: 数据无效{RESET_COLOR}")
-            except Exception as e:
-                logger.error(f"处理主要评分指标时出错: {str(e)}")
-                print(f"{ERROR_COLOR}  • 评分数据处理错误{RESET_COLOR}")
+        # 如果没有找到，尝试其他键
+        if not citation_data:
+            for key in ["citation_details", "引用验证", "验证结果"]:
+                if key in result and result[key]:
+                    citation_data = result[key]
+                    logger.info(f"找到引用分析数据，键名: {key}")
+                    break
         
-        # 4. 处理细分评分
-        logger.debug("开始处理细分评分指标")
-        sub_scores = deepseek_data.get("细分点评分", {})
-        if sub_scores and isinstance(sub_scores, dict):
-            print(f"\n{SECTION_COLOR}3. 细分评分指标:{RESET_COLOR}")
-            
-            # 按类别组织细分评分
-            categories = {
-                "内容真实性": [],
-                "信息准确性": [],
-                "来源可靠性": [],
-                "引用质量": [],
-                "语言客观性": [],
-                "逻辑连贯性": []
-            }
-            
-            for key, value in sub_scores.items():
-                for category in categories:
-                    if key.startswith(f"{category}_"):
-                        try:
-                            score = validate_score(value, f"细分评分.{key}")
-                            categories[category].append((key.split("_")[-1], score))
-                            logger.debug(f"细分评分 {key}: {score:.2f}")
-                        except ValueError:
-                            logger.warning(f"细分评分{key}无效: {value}")
-            
-            # 显示细分评分
-            for category, scores in categories.items():
-                if scores:
-                    print(f"{SUBHEADER_COLOR}  ▶ {category}相关指标:{RESET_COLOR}")
-                    for name, score in scores:
-                        color = SUCCESS_COLOR if score >= 0.8 else (WARNING_COLOR if score >= 0.6 else ERROR_COLOR)
-                        print(f"{color}    • {name}: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
-        
-        # 二、来源可靠性与引用分析
-        print(f"\n{SUBHEADER_COLOR}二、来源可靠性与引用分析{RESET_COLOR}")
-        print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
-        
-        # 5. 处理引用分析
-        logger.debug("开始处理引用分析")
-        citation_data = result.get("citation_analysis", {})
+        # 处理引用数据
         if citation_data and isinstance(citation_data, dict):
-            print(f"{SECTION_COLOR}1. 引用统计:{RESET_COLOR}")
             try:
-                # 基本引用统计
-                total_citations = int(citation_data.get("total_citations", 0))
-                verified_citations = int(citation_data.get("verified_citations", 0))
-                authority_score = validate_score(citation_data.get("authority_score", 0), "引用权威性")
-                diversity_score = validate_score(citation_data.get("diversity_score", 0), "引用多样性")
+                # 处理新格式的引用验证结果
+                if "引用验证评分" in citation_data and "陈述详情" in citation_data:
+                    # 显示总体评分
+                    score = citation_data.get("引用验证评分", 0.5)
+                    score_color = SUCCESS_COLOR if score >= 0.8 else (WARNING_COLOR if score >= 0.6 else ERROR_COLOR)
+                    print(f"{score_color}  • 引用验证评分: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
+                    
+                    # 显示总结
+                    if "总结" in citation_data:
+                        print(f"{DETAIL_COLOR}  • 总结: {citation_data['总结']}{RESET_COLOR}")
+                    
+                    # 显示陈述详情
+                    if isinstance(citation_data["陈述详情"], list):
+                        print(f"\n{SECTION_COLOR}陈述验证详情:{RESET_COLOR}")
+                        for i, statement in enumerate(citation_data["陈述详情"], 1):
+                            if isinstance(statement, dict):
+                                content = statement.get("内容", "未知内容")[:100]
+                                status = statement.get("验证状态", "未验证")
+                                importance = statement.get("重要性", "中")
+                                support = statement.get("支持度", 0)
+                                
+                                # 设置颜色
+                                status_color = SUCCESS_COLOR if status.startswith("已验证") else (WARNING_COLOR if status.startswith("部分") else ERROR_COLOR)
+                                imp_color = ERROR_COLOR if importance == "高" else (WARNING_COLOR if importance == "中" else DETAIL_COLOR)
+                                
+                                # 显示陈述内容和验证状态
+                                print(f"{DETAIL_COLOR}  • 陈述 {i}:{RESET_COLOR}")
+                                print(f"{DETAIL_COLOR}    - 内容: {content}{RESET_COLOR}")
+                                print(f"{imp_color}    - 重要性: {importance}{RESET_COLOR}")
+                                print(f"{status_color}    - 验证状态: {status}{RESET_COLOR}")
+                                
+                                if support > 0:
+                                    support_color = SUCCESS_COLOR if support >= 0.7 else (WARNING_COLOR if support >= 0.4 else ERROR_COLOR)
+                                    print(f"{support_color}    - 支持度: {support:.2f} {get_progress_bar(support)}{RESET_COLOR}")
+                                
+                                # 显示搜索结果
+                                if "搜索结果" in statement and isinstance(statement["搜索结果"], list):
+                                    results = statement["搜索结果"]
+                                    if results:
+                                        print(f"{DETAIL_COLOR}    - 相关结果:{RESET_COLOR}")
+                                        for j, result_item in enumerate(results[:2], 1):  # 显示前两个
+                                            if isinstance(result_item, dict):
+                                                title = result_item.get("title", "未知标题")
+                                                url = result_item.get("url", "")
+                                                print(f"{INFO_COLOR}      {j}. {title}{RESET_COLOR}")
+                                                if url:
+                                                    print(f"{INFO_COLOR}         {url}{RESET_COLOR}")
+                                        
+                                        if len(results) > 2:
+                                            print(f"{DETAIL_COLOR}      ... 等共 {len(results)} 个相关结果{RESET_COLOR}")
+                        
+                        # 显示验证统计
+                        verified_count = sum(1 for s in citation_data["陈述详情"] if isinstance(s, dict) and s.get("验证状态", "").startswith("已验证"))
+                        total_count = len(citation_data["陈述详情"])
+                        verification_ratio = verified_count / total_count if total_count > 0 else 0
+                        
+                        ratio_color = SUCCESS_COLOR if verification_ratio >= 0.7 else (WARNING_COLOR if verification_ratio >= 0.5 else ERROR_COLOR)
+                        print(f"\n{ratio_color}  • 验证统计: {verified_count}/{total_count} 陈述得到验证 ({verification_ratio:.1%}){RESET_COLOR}")
                 
-                verification_rate = verified_citations / total_citations if total_citations > 0 else 0
-                logger.info(f"引用统计: 总数={total_citations}, 已验证={verified_citations}, 验证率={verification_rate:.1%}")
-                
-                # 根据验证率选择颜色
-                verification_color = SUCCESS_COLOR if verification_rate >= 0.8 else (WARNING_COLOR if verification_rate >= 0.5 else ERROR_COLOR)
-                authority_color = SUCCESS_COLOR if authority_score >= 0.8 else (WARNING_COLOR if authority_score >= 0.6 else ERROR_COLOR)
-                diversity_color = SUCCESS_COLOR if diversity_score >= 0.8 else (WARNING_COLOR if diversity_score >= 0.6 else ERROR_COLOR)
-                
-                print(f"{DETAIL_COLOR}  • 引用总数: {total_citations} 处{RESET_COLOR}")
-                print(f"{verification_color}  • 验证通过数: {verified_citations} 处 (验证率: {verification_rate:.1%}){RESET_COLOR}")
-                print(f"{authority_color}  • 来源权威性: {authority_score:.2f} {get_progress_bar(authority_score)}{RESET_COLOR}")
-                print(f"{diversity_color}  • 来源多样性: {diversity_score:.2f} {get_progress_bar(diversity_score)}{RESET_COLOR}")
-                
-                # 引用详情
-                if "citation_details" in citation_data:
+                # 处理旧格式
+                elif "citation_details" in citation_data:
+                    # 旧格式处理
                     print(f"\n{SECTION_COLOR}引用详情:{RESET_COLOR}")
                     for i, cite in enumerate(citation_data["citation_details"], 1):
                         logger.debug(f"处理第{i}个引用: {cite}")
@@ -1013,18 +964,11 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                             print(f"{DETAIL_COLOR}    - 置信度: {cite['confidence']:.2%}{RESET_COLOR}")
             except Exception as e:
                 logger.error(f"处理引用分析时出错: {str(e)}")
-                print(f"{ERROR_COLOR}  • 引用数据处理错误{RESET_COLOR}")
+                logger.error(traceback.format_exc())
+                print(f"{ERROR_COLOR}  • 引用数据处理错误: {str(e)}{RESET_COLOR}")
         else:
-            # 添加日志记录main_scores的状态
-            if main_scores and isinstance(main_scores, dict):
-                logger.debug(f"引用分析数据不存在，但发现main_scores包含评分: 来源可靠性={main_scores.get('来源可靠性', '无')}, 引用质量={main_scores.get('引用质量', '无')}")
-            
-            # 只有当main_scores中也没有相关评分时才显示警告
-            if not (main_scores and isinstance(main_scores, dict) and 
-                   ("来源可靠性" in main_scores or "引用质量" in main_scores)):
-                print(f"{WARNING_COLOR}  • 未找到引用分析数据{RESET_COLOR}")
-                print(f"{DETAIL_COLOR}  • 建议：进行引用分析以提高内容可信度评估{RESET_COLOR}")
-                logger.warning("未找到引用分析数据，也未找到main_scores中的相关评分")
+            print(f"{WARNING_COLOR}  • 未找到引用分析数据{RESET_COLOR}")
+            print(f"{DETAIL_COLOR}  • 建议：进行引用分析以提高内容可信度评估{RESET_COLOR}")
         
         # 6. 处理来源评分
         print(f"\n{SECTION_COLOR}2. 来源评分与分析:{RESET_COLOR}")
@@ -1037,412 +981,74 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                 logger.info(f"找到来源质量数据，键名: {key}")
                 break
         
-        if main_scores and isinstance(main_scores, dict):
-            try:
-                source_reliability = float(main_scores.get("来源可靠性", 0))
-                citation_quality = float(main_scores.get("引用质量", 0))
-                
-                source_color = SUCCESS_COLOR if source_reliability >= 0.8 else (WARNING_COLOR if source_reliability >= 0.6 else ERROR_COLOR)
-                citation_color = SUCCESS_COLOR if citation_quality >= 0.8 else (WARNING_COLOR if citation_quality >= 0.6 else ERROR_COLOR)
-                
-                print(f"{source_color}  • 来源可靠性: {source_reliability:.2f} {get_progress_bar(source_reliability)}{RESET_COLOR}")
-                print(f"{citation_color}  • 引用质量: {citation_quality:.2f} {get_progress_bar(citation_quality)}{RESET_COLOR}")
-                
-                # 解释评分含义
-                if source_reliability >= 0.8:
-                    print(f"{DETAIL_COLOR}    - 来源高度可靠，包含权威或官方信息{RESET_COLOR}")
-                elif source_reliability >= 0.6:
-                    print(f"{DETAIL_COLOR}    - 来源基本可靠，但可能包含部分未经验证信息{RESET_COLOR}")
-                else:
-                    print(f"{DETAIL_COLOR}    - 来源可靠性存疑，建议核实关键信息{RESET_COLOR}")
-                
-                if citation_quality >= 0.8:
-                    print(f"{DETAIL_COLOR}    - 引用质量高，引用准确且来源可靠{RESET_COLOR}")
-                elif citation_quality >= 0.6:
-                    print(f"{DETAIL_COLOR}    - 引用质量一般，部分引用需要核实{RESET_COLOR}")
-                else:
-                    print(f"{DETAIL_COLOR}    - 引用质量差，多数引用无法验证{RESET_COLOR}")
-            except (ValueError, TypeError):
-                print(f"{ERROR_COLOR}  • 评分数据格式错误{RESET_COLOR}")
+        # 显示时效性
+        timeliness = cross_validation_data.get("timeliness", cross_validation_data.get("时效性", "未知"))
+        print(f"{DETAIL_COLOR}  • 时效性评估: {timeliness}{RESET_COLOR}")
         
-        # 显示详细的来源质量数据
-        if source_quality_data and isinstance(source_quality_data, dict):
-            print(f"\n{SECTION_COLOR}3. 详细来源分析:{RESET_COLOR}")
-            
-            # 域名信息
-            domain_trust = source_quality_data.get("domain_trust", source_quality_data.get("trust_level", "未知"))
-            if domain_trust != "未知":
-                trust_color = SUCCESS_COLOR if "高" in domain_trust else (WARNING_COLOR if "中" in domain_trust else ERROR_COLOR)
-                print(f"{trust_color}  • 域名可信度: {domain_trust}{RESET_COLOR}")
-            
-            # 来源统计
-            source_count = source_quality_data.get("source_count", 0)
-            if source_count > 0:
-                count_color = SUCCESS_COLOR if source_count >= 5 else (WARNING_COLOR if source_count >= 2 else ERROR_COLOR)
-                print(f"{count_color}  • 引用来源数量: {source_count} 个{RESET_COLOR}")
-            
-            # 权威来源
-            authority_sources = source_quality_data.get("authority_sources", 0)
-            if authority_sources > 0:
-                auth_color = SUCCESS_COLOR if authority_sources >= 3 else (WARNING_COLOR if authority_sources >= 1 else ERROR_COLOR)
-                print(f"{auth_color}  • 权威来源数量: {authority_sources} 个{RESET_COLOR}")
-            
-            # 直接引用
-            direct_quotes = source_quality_data.get("direct_quotes", 0)
-            if direct_quotes > 0:
-                quote_color = SUCCESS_COLOR if direct_quotes >= 3 else (WARNING_COLOR if direct_quotes >= 1 else ERROR_COLOR)
-                print(f"{quote_color}  • 直接引用数量: {direct_quotes} 个{RESET_COLOR}")
-            
-            # 来源列表
-            source_list = source_quality_data.get("sources", source_quality_data.get("source_list", []))
-            if source_list and isinstance(source_list, list) and len(source_list) > 0:
-                print(f"\n{DETAIL_COLOR}  • 主要来源列表:{RESET_COLOR}")
-                for i, source in enumerate(source_list[:5], 1):  # 最多显示5个来源
-                    if isinstance(source, dict):
-                        name = source.get("name", "未知来源")
-                        reliability = source.get("reliability", 0)
-                        rel_color = SUCCESS_COLOR if reliability >= 0.8 else (WARNING_COLOR if reliability >= 0.6 else ERROR_COLOR)
-                        print(f"{DETAIL_COLOR}    {i}. {name}{RESET_COLOR}")
-                        if reliability > 0:
-                            print(f"{rel_color}       可信度: {reliability:.2f} {get_progress_bar(reliability)}{RESET_COLOR}")
-                    else:
-                        print(f"{DETAIL_COLOR}    {i}. {source}{RESET_COLOR}")
-                
-                if len(source_list) > 5:
-                    print(f"{DETAIL_COLOR}    ... 等共 {len(source_list)} 个来源{RESET_COLOR}")
-            
-            # 域名信息
-            if "domain_info" in source_quality_data:
-                domain_info = source_quality_data["domain_info"]
-                if isinstance(domain_info, dict) and domain_info:
-                    print(f"\n{DETAIL_COLOR}  • 域名信息:{RESET_COLOR}")
-                    if "registration_date" in domain_info:
-                        print(f"{DETAIL_COLOR}    - 注册日期: {domain_info['registration_date']}{RESET_COLOR}")
-                    if "reputation" in domain_info:
-                        rep = domain_info["reputation"]
-                        rep_color = SUCCESS_COLOR if rep >= 8 else (WARNING_COLOR if rep >= 5 else ERROR_COLOR)
-                        print(f"{rep_color}    - 网站声誉评分: {rep}/10{RESET_COLOR}")
-                    if "category" in domain_info:
-                        print(f"{DETAIL_COLOR}    - 网站类别: {domain_info['category']}{RESET_COLOR}")
+        # 显示可信内容总结 (新增部分)
+        if "可信内容总结" in cross_validation_data and cross_validation_data["可信内容总结"]:
+            print(f"\n{SECTION_COLOR}可信内容总结:{RESET_COLOR}")
+            summary = cross_validation_data["可信内容总结"]
+            # 使用醒目颜色显示总结
+            print(f"{SUCCESS_COLOR}  {summary}{RESET_COLOR}")
         
-        # 如果没有任何来源数据
-        if not source_quality_data and not (main_scores and isinstance(main_scores, dict) and ("来源可靠性" in main_scores or "引用质量" in main_scores)):
-            print(f"{WARNING_COLOR}  • 未找到详细的来源分析数据{RESET_COLOR}")
-            print(f"{DETAIL_COLOR}  • 建议：进行更详细的来源分析以提高评估准确性{RESET_COLOR}")
+        # 显示问题点 - 修改此部分
+        # 计算验证点中无结果的数量和来源数量
+        no_result_count = 0
+        source_count = 0
+        search_results_count = 0
         
-        # 三、语言分析
-        print(f"\n{SUBHEADER_COLOR}三、语言分析{RESET_COLOR}")
-        print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
-        
-        # 7. 处理语言中立性
-        logger.debug("开始处理语言中立性分析")
-        neutrality = result.get("语言中立性", {})
-        if neutrality and isinstance(neutrality, dict):
-            print(f"{SECTION_COLOR}1. 语言中立性评分:{RESET_COLOR}")
+        # 首先尝试计算无结果的验证点
+        if verification_points and isinstance(verification_points, list):
+            no_result_count = sum(1 for p in verification_points if isinstance(p, dict) and p.get("搜索结果数量", 0) == 0)
             
-            # 总体评分
-            if "score" in neutrality:
-                try:
-                    overall_score = validate_score(neutrality["score"], "语言中立性总分")
-                    score_color = SUCCESS_COLOR if overall_score >= 0.8 else (WARNING_COLOR if overall_score >= 0.6 else ERROR_COLOR)
-                    print(f"{score_color}  • 总体评分: {overall_score:.2f} {get_progress_bar(overall_score)}{RESET_COLOR}")
-                    logger.info(f"语言中立性总分: {overall_score:.2f}")
-                except ValueError:
-                    logger.warning("语言中立性总分无效")
-            
-            # DeepSeek详细评分
-            scores = neutrality.get("deepseek_scores", {})
-            if scores and isinstance(scores, dict):
-                print(f"\n{SECTION_COLOR}2. 详细评分指标:{RESET_COLOR}")
-                try:
-                    score_descriptions = {
-                        "情感词汇": "文本中情感色彩词汇的使用程度",
-                        "情感平衡": "正面与负面情感的平衡程度",
-                        "极端表述": "极端或绝对化表述的使用程度",
-                        "煽动性表达": "可能引起强烈情感反应的表达",
-                        "主观评价": "个人观点和主观判断的程度"
-                    }
-                    
-                    for key, value in scores.items():
-                        try:
-                            score = validate_score(value, f"语言中立性.{key}")
-                            score_color = SUCCESS_COLOR if score >= 0.8 else (WARNING_COLOR if score >= 0.6 else ERROR_COLOR)
-                            print(f"{score_color}  • {key}: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
-                            if key in score_descriptions:
-                                print(f"{DETAIL_COLOR}    - {score_descriptions[key]}{RESET_COLOR}")
-                            logger.debug(f"语言中立性 {key}: {score:.2f}")
-                        except ValueError:
-                            logger.warning(f"语言中立性评分{key}无效: {value}")
-                except Exception as e:
-                    logger.error(f"处理语言中立性详细评分时出错: {str(e)}")
-            
-            # DeepSeek分析结果
-            if "deepseek_analysis" in neutrality:
-                print(f"\n{SECTION_COLOR}3. 详细分析:{RESET_COLOR}")
-                analysis = neutrality["deepseek_analysis"]
-                if isinstance(analysis, str):
-                    print(f"{DETAIL_COLOR}  • {analysis}{RESET_COLOR}")
-                elif isinstance(analysis, list):
-                    for point in analysis:
-                        print(f"{DETAIL_COLOR}  • {point}{RESET_COLOR}")
+            # 同时尝试从验证点中获取搜索结果总数
+            for p in verification_points:
+                if isinstance(p, dict) and "搜索结果" in p and isinstance(p["搜索结果"], int):
+                    search_results_count += p["搜索结果"]
+                elif isinstance(p, dict) and "搜索结果数量" in p and isinstance(p["搜索结果数量"], int):
+                    search_results_count += p["搜索结果数量"]
         
-        # 8. 处理语言评分
-        logger.debug("开始处理语言评分")
-        if main_scores and isinstance(main_scores, dict):
-            print(f"\n{SECTION_COLOR}语言表达评分:{RESET_COLOR}")
-            try:
-                language_scores = {
-                    "语言客观性": "语言表达的客观中立程度",
-                    "逻辑连贯性": "内容的逻辑性和连贯性",
-                    "表达准确性": "用词和表达的准确程度",
-                    "专业性": "专业术语和概念的使用准确性"
-                }
-                
-                for key, desc in language_scores.items():
-                    if key in main_scores:
-                        try:
-                            score = validate_score(main_scores[key], f"语言评分.{key}")
-                            score_color = SUCCESS_COLOR if score >= 0.8 else (WARNING_COLOR if score >= 0.6 else ERROR_COLOR)
-                            print(f"{score_color}  • {key}: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
-                            print(f"{DETAIL_COLOR}    - {desc}{RESET_COLOR}")
-                            logger.debug(f"语言评分 {key}: {score:.2f}")
-                        except ValueError:
-                            logger.warning(f"语言评分{key}无效: {main_scores[key]}")
-            except Exception as e:
-                logger.error(f"处理语言评分时出错: {str(e)}")
-        
-        # 添加交叉验证部分
-        print(f"\n{SUBHEADER_COLOR}四、交叉验证结果{RESET_COLOR}")
-        print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
-        
-        # 优化交叉验证数据的显示
-        has_cv_data = False
-        
-        # 检查是否有标准格式的交叉验证数据
-        if cross_validation_data and isinstance(cross_validation_data, dict):
-            has_cv_data = True
-            print(f"{SECTION_COLOR}交叉验证评估:{RESET_COLOR}")
-            try:
-                # 提取验证点
-                verification_points = []
-                # 尝试多个可能的键名
-                for key in ["verification_points", "claims", "验证点", "关键声明", "points"]:
-                    if key in cross_validation_data and cross_validation_data[key]:
-                        verification_points = cross_validation_data[key]
-                        logger.info(f"找到验证点数据，键名: {key}")
+        # 尝试获取来源数量
+        # 直接使用来源列表长度
+        if sources and isinstance(sources, list):
+            source_count = len(sources)
+        # 尝试从交叉验证数据中获取来源数量
+        else:
+            # 尝试多种可能的键名
+            for key in ["source_count", "sources_count", "搜索结果总数", "来源数量", "相关来源数"]:
+                if key in cross_validation_data and isinstance(cross_validation_data[key], (int, float, str)):
+                    try:
+                        source_count = int(cross_validation_data[key])
                         break
-                
-                # 提取来源信息
-                sources = []
-                for key in ["sources", "verified_sources", "相关来源", "related_sources"]:
-                    if key in cross_validation_data and cross_validation_data[key]:
-                        sources = cross_validation_data[key]
-                        logger.info(f"找到来源数据，键名: {key}")
-                        break
-                
-                # 显示验证点
-                if verification_points:
-                    print(f"\n{SECTION_COLOR}验证点分析:{RESET_COLOR}")
-                    for i, point in enumerate(verification_points, 1):
-                        if isinstance(point, dict):
-                            # 检查是否包含key_points键，如果包含则说明是多个验证点的集合
-                            if "key_points" in point and isinstance(point["key_points"], list):
-                                for j, sub_point in enumerate(point["key_points"], 1):
-                                    # 获取内容
-                                    if isinstance(sub_point, dict) and "内容" in sub_point:
-                                        content = sub_point["内容"]
-                                        importance = sub_point.get("重要性", "中")
-                                        score_color = SUCCESS_COLOR if "验证评分" in point and point["验证评分"] >= 0.7 else (WARNING_COLOR if "验证评分" in point and point["验证评分"] >= 0.5 else ERROR_COLOR)
-                                        print(f"{score_color}  • 验证点 {i}.{j}: {content}{RESET_COLOR}")
-                                        if "验证评分" in point:
-                                            print(f"{score_color}    得分: {point['验证评分']:.2f} {get_progress_bar(point['验证评分'])}{RESET_COLOR}")
-                                        
-                                        # 显示重要性
-                                        print(f"{DETAIL_COLOR}    重要性: {importance}{RESET_COLOR}")
-                                        
-                                        # 如果有验证结论，显示它
-                                        if "验证结论" in point and point["验证结论"]:
-                                            print(f"{DETAIL_COLOR}    结论: {point['验证结论']}{RESET_COLOR}")
-                                continue
-                            
-                            # 获取内容，尝试多个可能的键名
-                            content = None
-                            for content_key in ["内容", "验证内容", "content", "claim", "statement"]:
-                                if content_key in point and point[content_key]:
-                                    content = point[content_key]
-                                    break
-                            
-                            if not content:
-                                content = "未知内容"
-                                
-                            # 获取分数，尝试多个可能的键名
-                            score = None
-                            for score_key in ["验证评分", "评分", "score", "confidence"]:
-                                if score_key in point and point[score_key] is not None:
-                                    try:
-                                        score = float(point[score_key])
-                                        break
-                                    except (ValueError, TypeError):
-                                        pass
-                            
-                            if score is None:
-                                score = 0.5
-                                
-                            score_color = SUCCESS_COLOR if score >= 0.7 else (WARNING_COLOR if score >= 0.5 else ERROR_COLOR)
-                            print(f"{score_color}  • 验证点 {i}: {content}{RESET_COLOR}")
-                            print(f"{score_color}    得分: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
-                            
-                            # 如果有验证结论，显示它
-                            if "验证结论" in point and point["验证结论"]:
-                                print(f"{DETAIL_COLOR}    结论: {point['验证结论']}{RESET_COLOR}")
-                            
-                            # 如果有搜索结果数量，显示它
-                            if "搜索结果数量" in point:
-                                result_count = point["搜索结果数量"]
-                                if result_count == 0:
-                                    print(f"{WARNING_COLOR}    搜索结果: 未找到相关内容{RESET_COLOR}")
-                                else:
-                                    print(f"{DETAIL_COLOR}    搜索结果: {result_count}个相关内容{RESET_COLOR}")
-                                    
-                            # 显示搜索结果链接和摘要
-                            if "搜索结果摘要" in point and point["搜索结果摘要"]:
-                                print(f"{DETAIL_COLOR}    相关信息摘要:{RESET_COLOR}")
-                                for j, summary in enumerate(point["搜索结果摘要"], 1):
-                                    if summary:
-                                        # 摘要限制在100字符以内，显示为间断摘要
-                                        if len(summary) > 100:
-                                            formatted_summary = summary[:40] + "..." + summary[len(summary)-40:]
-                                        else:
-                                            formatted_summary = summary
-                                        print(f"{DETAIL_COLOR}      {j}. {formatted_summary}{RESET_COLOR}")
-                            
-                            # 获取搜索结果链接
-                            search_results = None
-                            for results_key in ["search_results", "搜索结果", "results", "相关信息"]:
-                                if results_key in point and point[results_key]:
-                                    search_results = point[results_key]
-                                    break
-                            
-                            # 如果找到了搜索结果链接，显示它们
-                            if search_results and isinstance(search_results, list):
-                                print(f"{DETAIL_COLOR}    相关链接:{RESET_COLOR}")
-                                for j, result_item in enumerate(search_results[:3], 1):  # 限制显示3个链接
-                                    if isinstance(result_item, dict):
-                                        url = result_item.get("url", "")
-                                        title = result_item.get("title", "未知标题")
-                                        print(f"{DETAIL_COLOR}      {j}. {title}{RESET_COLOR}")
-                                        print(f"{INFO_COLOR}         {url}{RESET_COLOR}")
-                                        
-                                        # 如果有内容摘要，显示间断摘要
-                                        content = result_item.get("content", "")
-                                        if content:
-                                            if len(content) > 100:
-                                                formatted_content = content[:40] + "..." + content[len(content)-40:]
-                                            else:
-                                                formatted_content = content
-                                            print(f"{NEUTRAL_COLOR}         摘要: {formatted_content}{RESET_COLOR}")
-                                    elif isinstance(result_item, str) and ("http://" in result_item or "https://" in result_item):
-                                        print(f"{INFO_COLOR}      {j}. {result_item}{RESET_COLOR}")
-                                
-                                if len(search_results) > 3:
-                                    print(f"{DETAIL_COLOR}      ... 等共 {len(search_results)} 个相关链接{RESET_COLOR}")
-                else:
-                    # 如果没有验证点但已通过测试验证了SearXNG可用，显示提示信息
-                    print(f"\n{WARNING_COLOR}  • 未能成功提取验证点，但搜索服务正常{RESET_COLOR}")
-                    print(f"{DETAIL_COLOR}  • 建议: 请检查文本是否包含可验证的事实陈述{RESET_COLOR}")
-                
-                # 显示来源信息
-                if sources:
-                    print(f"\n{SECTION_COLOR}相关来源分析:{RESET_COLOR}")
-                    for i, source in enumerate(sources, 1):
-                        if isinstance(source, dict):
-                            url = source.get("url", "未知URL")
-                            reliability = source.get("reliability", source.get("credibility", 0.5))
-                            rel_color = SUCCESS_COLOR if reliability >= 0.7 else (WARNING_COLOR if reliability >= 0.5 else ERROR_COLOR)
-                            print(f"{rel_color}  • 来源 {i}: {url}{RESET_COLOR}")
-                            print(f"{rel_color}    可信度: {reliability:.2f} {get_progress_bar(reliability)}{RESET_COLOR}")
-                
-                # 显示整体评分
-                cv_score = cross_validation_data.get("score", cross_validation_data.get("overall_score", cross_validation_data.get("总体可信度", 0.5)))
-                score_color = SUCCESS_COLOR if cv_score >= 0.7 else (WARNING_COLOR if cv_score >= 0.5 else ERROR_COLOR)
-                print(f"\n{score_color}  • 交叉验证总分: {cv_score:.2f} {get_progress_bar(cv_score)}{RESET_COLOR}")
-                
-                # 显示验证结论
-                if "验证结论" in cross_validation_data and cross_validation_data["验证结论"]:
-                    print(f"{DETAIL_COLOR}  • 验证结论: {cross_validation_data['验证结论']}{RESET_COLOR}")
-                
-                # 显示时效性
-                timeliness = cross_validation_data.get("timeliness", cross_validation_data.get("时效性", "未知"))
-                print(f"{DETAIL_COLOR}  • 时效性评估: {timeliness}{RESET_COLOR}")
-                
-                # 显示可信内容总结 (新增部分)
-                if "可信内容总结" in cross_validation_data and cross_validation_data["可信内容总结"]:
-                    print(f"\n{SECTION_COLOR}可信内容总结:{RESET_COLOR}")
-                    summary = cross_validation_data["可信内容总结"]
-                    # 使用醒目颜色显示总结
-                    print(f"{SUCCESS_COLOR}  {summary}{RESET_COLOR}")
-                
-                # 显示问题点 - 修改此部分
-                # 计算验证点中无结果的数量和来源数量
-                no_result_count = 0
-                source_count = 0
-                search_results_count = 0
-                
-                # 首先尝试计算无结果的验证点
-                if verification_points and isinstance(verification_points, list):
-                    no_result_count = sum(1 for p in verification_points if isinstance(p, dict) and p.get("搜索结果数量", 0) == 0)
+                    except (ValueError, TypeError):
+                        pass
+        
+        # 如果搜索结果数大于0但来源计数为0，使用搜索结果数作为来源计数的估计
+        if search_results_count > 0 and source_count == 0:
+            logger.info(f"使用搜索结果数量({search_results_count})作为来源数量估计")
+            source_count = search_results_count
+        
+        # 只有在确实有验证点但没有找到结果，或来源太少时才显示问题
+        has_problems = False
+        
+        if verification_points:
+            # 只有当来源确实太少(小于2)且搜索结果也不足时才显示来源不足问题
+            if source_count < 2 and search_results_count < 3:
+                has_problems = True
+                print(f"\n{SECTION_COLOR}交叉验证问题:{RESET_COLOR}")
+                print(f"{WARNING_COLOR}  • 缺乏足够的交叉验证来源 (仅{source_count}个){RESET_COLOR}")
+                print(f"{DETAIL_COLOR}    - 建议：建议寻找更多独立来源验证信息{RESET_COLOR}")
+            
+            # 无论来源数量如何，如果有验证点没有找到结果，都显示这个问题
+            if no_result_count > 0:
+                if not has_problems:
+                    has_problems = True
+                    print(f"\n{SECTION_COLOR}交叉验证问题:{RESET_COLOR}")
                     
-                    # 同时尝试从验证点中获取搜索结果总数
-                    for p in verification_points:
-                        if isinstance(p, dict) and "搜索结果" in p and isinstance(p["搜索结果"], int):
-                            search_results_count += p["搜索结果"]
-                        elif isinstance(p, dict) and "搜索结果数量" in p and isinstance(p["搜索结果数量"], int):
-                            search_results_count += p["搜索结果数量"]
-                
-                # 尝试获取来源数量
-                # 直接使用来源列表长度
-                if sources and isinstance(sources, list):
-                    source_count = len(sources)
-                # 尝试从交叉验证数据中获取来源数量
-                else:
-                    # 尝试多种可能的键名
-                    for key in ["source_count", "sources_count", "搜索结果总数", "来源数量", "相关来源数"]:
-                        if key in cross_validation_data and isinstance(cross_validation_data[key], (int, float, str)):
-                            try:
-                                source_count = int(cross_validation_data[key])
-                                break
-                            except (ValueError, TypeError):
-                                pass
-                
-                # 如果搜索结果数大于0但来源计数为0，使用搜索结果数作为来源计数的估计
-                if search_results_count > 0 and source_count == 0:
-                    logger.info(f"使用搜索结果数量({search_results_count})作为来源数量估计")
-                    source_count = search_results_count
-                
-                # 只有在确实有验证点但没有找到结果，或来源太少时才显示问题
-                has_problems = False
-                
-                if verification_points:
-                    # 只有当来源确实太少(小于2)且搜索结果也不足时才显示来源不足问题
-                    if source_count < 2 and search_results_count < 3:
-                        has_problems = True
-                        print(f"\n{SECTION_COLOR}交叉验证问题:{RESET_COLOR}")
-                        print(f"{WARNING_COLOR}  • 缺乏足够的交叉验证来源 (仅{source_count}个){RESET_COLOR}")
-                        print(f"{DETAIL_COLOR}    - 建议：建议寻找更多独立来源验证信息{RESET_COLOR}")
-                    
-                    # 无论来源数量如何，如果有验证点没有找到结果，都显示这个问题
-                    if no_result_count > 0:
-                        if not has_problems:
-                            has_problems = True
-                            print(f"\n{SECTION_COLOR}交叉验证问题:{RESET_COLOR}")
-                            
-                        print(f"{WARNING_COLOR}  • {no_result_count}个验证点没有找到相关信息{RESET_COLOR}")
-                        print(f"{DETAIL_COLOR}    - 这些验证点可能需要额外验证{RESET_COLOR}")
-                        print(f"{DETAIL_COLOR}    - 建议：针对这些特定信息点进行额外验证{RESET_COLOR}")
-                
-            except Exception as e:
-                logger.error(f"处理交叉验证数据时出错: {str(e)}")
-                print(f"{ERROR_COLOR}  • 交叉验证数据处理错误: {str(e)}{RESET_COLOR}")
+                print(f"{WARNING_COLOR}  • {no_result_count}个验证点没有找到相关信息{RESET_COLOR}")
+                print(f"{DETAIL_COLOR}    - 这些验证点可能需要额外验证{RESET_COLOR}")
+                print(f"{DETAIL_COLOR}    - 建议：针对这些特定信息点进行额外验证{RESET_COLOR}")
         
         # 检查权重中是否有交叉验证的贡献
         if not has_cv_data and "交叉验证" in weights:
