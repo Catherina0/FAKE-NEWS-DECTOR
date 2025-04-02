@@ -19,3 +19,7 @@ saved_news/
 print_formatted_result
 myenv
 myenv.zip
+six-1.17.0.dist-info/
+dateutil/
+six.py
+python_dateutil-2.9.0.post0.dist-info/
