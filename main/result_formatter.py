@@ -144,7 +144,7 @@ def validate_data(data: Dict[str, Any], required_fields: list, context: str = ""
         return False
     return True
 
-def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = None) -> Tuple[float, dict]:
+def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = None) -> Tuple[float, dict, dict]:
     """
     计算加权总分
     
@@ -153,7 +153,7 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
         cross_validation_data: 交叉验证数据
     
     返回:
-        Tuple[float, dict]: (加权总分, 各维度权重)
+        Tuple[float, dict, dict]: (加权总分, 各维度权重, 各维度实际使用的分数)
     """
     # 基础维度权重 - 按优先级排序
     base_weights = {
@@ -349,7 +349,7 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
                 cv_score = float(cross_validation_data.get('score'))
                 cv_score = max(0.3, min(0.8, cv_score))  # 限制范围
                 logger.info(f"仅使用交叉验证评分: {cv_score:.2f}")
-                return cv_score, {"交叉验证": 1.0}
+                return cv_score, {"交叉验证": 1.0}, dimension_scores
             
             # 其次尝试综合推断
             if isinstance(cross_validation_data, dict):
@@ -378,14 +378,14 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
                 # 确保在合理范围内
                 inferred_score = max(0.3, min(0.8, base_score))
                 logger.info(f"从交叉验证数据推断评分: {inferred_score:.2f}")
-                return inferred_score, {"交叉验证": 1.0}
+                return inferred_score, {"交叉验证": 1.0}, dimension_scores
         except Exception as e:
             logger.error(f"尝试使用交叉验证数据失败: {str(e)}")
     
     # 如果没有有效的评分项，返回None
     if total_weight == 0:
         logger.warning("没有有效评分项，返回None")
-        return None, {}
+        return None, {}, dimension_scores
     
     # 计算最终得分
     final_score = weighted_sum / total_weight
@@ -406,7 +406,7 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
         logger.debug(f"由于维度覆盖率低({coverage_ratio:.2f})，评分从 {original_score:.2f} 调整为 {final_score:.2f}")
     
     logger.info(f"计算得到加权总分: {final_score:.2f} (原始加权平均: {weighted_sum/total_weight:.2f})")
-    return final_score, used_weights
+    return final_score, used_weights, dimension_scores
 
 def analyze_problems(result: dict, total_score: float, main_scores: dict, cross_validation_data: dict) -> list:
     """
@@ -706,7 +706,7 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
             main_scores = deepseek_data.get("各大类评分", {})
         
         # 计算加权总分，包含交叉验证
-        total_score, weights = calculate_weighted_score(main_scores, cross_validation_data)
+        total_score, weights, dimension_scores = calculate_weighted_score(main_scores, cross_validation_data)
         
         if total_score is None:
             error_msg = "无法计算加权总分，评分数据无效"
@@ -769,9 +769,10 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
             sorted_weights = sorted(weights.items(), key=lambda x: x[1], reverse=True)
             
             for dimension, weight in sorted_weights:
-                if dimension in main_scores:
+                # 使用dimension_scores中的分数（包含了实际用于计算总分的值）
+                if dimension in dimension_scores:
                     # 计算该维度对总分的贡献
-                    score = float(main_scores[dimension])
+                    score = dimension_scores[dimension]
                     contribution = score * weight * 100 / total_score_pct  # 贡献比例
                     
                     # 根据贡献大小设置颜色
@@ -781,21 +782,35 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                     dimension_desc = dimension_display.get(dimension, dimension)
                     print(f"{color}  • {dimension}: {score:.2f} × 权重{weight:.2f} = {score*weight:.2f} (贡献{contribution:.1f}%){RESET_COLOR}")
                     print(f"{NEUTRAL_COLOR}    - {dimension_desc}{RESET_COLOR}")
-                elif dimension == "交叉验证" and "交叉验证" in weights:
-                    # 交叉验证可能没有在main_scores中，但有权重
-                    cv_score = 0.0
-                    # 尝试从交叉验证数据中提取分数
-                    if cross_validation_data and isinstance(cross_validation_data, dict) and "score" in cross_validation_data:
-                        cv_score = float(cross_validation_data["score"])
-                    else:
-                        # 使用推导的分数 (总分乘以权重比例)
-                        cv_score = total_score * weight
-                    
-                    contribution = cv_score * weight * 100 / total_score_pct
-                    color = SUCCESS_COLOR if contribution >= 25 else (DETAIL_COLOR if contribution >= 15 else NEUTRAL_COLOR)
-                    
-                    print(f"{color}  • 交叉验证: {cv_score:.2f} × 权重{weight:.2f} = {cv_score*weight:.2f} (贡献{contribution:.1f}%){RESET_COLOR}")
-                    print(f"{NEUTRAL_COLOR}    - 外部信息的验证确认{RESET_COLOR}")
+                else:
+                    # 如果在dimension_scores中找不到，使用旧方法
+                    logger.warning(f"在dimension_scores中未找到{dimension}的分数")
+                    if dimension in main_scores:
+                        score = float(main_scores[dimension])
+                        contribution = score * weight * 100 / total_score_pct
+                        
+                        color = SUCCESS_COLOR if contribution >= 25 else (DETAIL_COLOR if contribution >= 15 else NEUTRAL_COLOR)
+                        dimension_desc = dimension_display.get(dimension, dimension)
+                        print(f"{color}  • {dimension}: {score:.2f} × 权重{weight:.2f} = {score*weight:.2f} (贡献{contribution:.1f}%){RESET_COLOR}")
+                        print(f"{NEUTRAL_COLOR}    - {dimension_desc}{RESET_COLOR}")
+                    elif dimension == "交叉验证" and "交叉验证" in weights:
+                        # 交叉验证可能没有在dimension_scores和main_scores中，但有权重
+                        logger.warning("交叉验证分数在任何地方都未找到，尝试推导")
+                        # 尝试从交叉验证数据中提取分数
+                        cv_score = 0.0
+                        if cross_validation_data and isinstance(cross_validation_data, dict) and "score" in cross_validation_data:
+                            cv_score = float(cross_validation_data["score"])
+                            logger.info(f"从cross_validation_data['score']获取分数: {cv_score}")
+                        else:
+                            # 使用推导的分数 (总分乘以权重比例)
+                            cv_score = total_score * weight
+                            logger.info(f"使用推导的分数: {cv_score}")
+                        
+                        contribution = cv_score * weight * 100 / total_score_pct
+                        color = SUCCESS_COLOR if contribution >= 25 else (DETAIL_COLOR if contribution >= 15 else NEUTRAL_COLOR)
+                        
+                        print(f"{color}  • 交叉验证: {cv_score:.2f} × 权重{weight:.2f} = {cv_score*weight:.2f} (贡献{contribution:.1f}%){RESET_COLOR}")
+                        print(f"{NEUTRAL_COLOR}    - 外部信息的验证确认{RESET_COLOR}")
         
         # 获取摘要
         summary = get_credibility_summary(total_score)
@@ -1607,7 +1622,21 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                             print(f"{rel_color}    可信度: {reliability:.2f} {get_progress_bar(reliability)}{RESET_COLOR}")
                 
                 # 显示整体评分
-                cv_score = cross_validation_data.get("score", cross_validation_data.get("overall_score", cross_validation_data.get("总体可信度", 0.5)))
+                # 优先使用dimension_scores中的交叉验证分数，这是实际参与总分计算的值
+                cv_score = None
+                if "交叉验证" in dimension_scores:
+                    cv_score = dimension_scores["交叉验证"]
+                    logger.info(f"使用dimension_scores中的交叉验证分数: {cv_score}")
+                # 如果dimension_scores中没有，则使用cross_validation_data
+                if cv_score is None:
+                    cv_score = cross_validation_data.get("score")
+                    if cv_score is not None:
+                        logger.info(f"使用cross_validation_data['score']的交叉验证分数: {cv_score}")
+                    else:
+                        # 如果找不到score字段，再尝试其他字段
+                        cv_score = cross_validation_data.get("overall_score", cross_validation_data.get("总体可信度", 0.5))
+                        logger.warning(f"未找到交叉验证score字段，使用备选字段值: {cv_score}")
+                
                 score_color = SUCCESS_COLOR if cv_score >= 0.7 else (WARNING_COLOR if cv_score >= 0.5 else ERROR_COLOR)
                 print(f"\n{score_color}  • 交叉验证总分: {cv_score:.2f} {get_progress_bar(cv_score)}{RESET_COLOR}")
                 
