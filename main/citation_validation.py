@@ -115,25 +115,60 @@ def validate_citations(text: str) -> Tuple[float, Dict[str, Any]]:
                 verified_count += 1
                 continue
             
-            # 如果文本太长，截取前100个字符进行搜索
-            search_text = clean_text[:100] if len(clean_text) > 100 else clean_text
+            # 提取更有效的搜索文本
+            # 如果文本太长，截取关键部分进行搜索
+            # 改为智能提取更短的关键部分，增加搜索成功率
+            if len(clean_text) > 80:
+                # 尝试分割句子，选择一个有意义的句子进行搜索
+                sentences = re.split(r'[.!?。！？]', clean_text)
+                search_text = ""
+                for sentence in sentences:
+                    if len(sentence.strip()) >= 15 and len(sentence.strip()) <= 80:
+                        search_text = sentence.strip()
+                        break
+                
+                # 如果没有找到合适的句子，就使用前60个字符
+                if not search_text:
+                    search_text = clean_text[:60]
+            else:
+                search_text = clean_text
             
             try:
-                # 使用SearXNG搜索
+                # 使用SearXNG搜索 - 移除精确匹配引号，使用更宽松的匹配方式
                 logger.info(f"使用SearXNG搜索: {search_text}")
-                search_results = search_with_searxng(f'"{search_text}"', num_results=5)
+                
+                # 对于特别专业的术语，尝试提取关键词
+                keywords = re.sub(r'\b(and|or|the|a|an|in|on|at|to|for|with|by|of|as)\b', ' ', search_text, flags=re.IGNORECASE)
+                keywords = re.sub(r'\s+', ' ', keywords).strip()
+                
+                # 如果提取的关键词长度合适，就使用关键词搜索
+                if 15 <= len(keywords) <= 60:
+                    logger.debug(f"使用提取的关键词搜索: {keywords}")
+                    search_results = search_with_searxng(keywords, num_results=5)
+                else:
+                    # 不再使用精确匹配(引号)，改为普通搜索
+                    search_results = search_with_searxng(search_text, num_results=5)
                 
                 if not search_results or not search_results.get("results"):
                     logger.warning("SearXNG搜索未返回结果")
-                    verification_results.append({
-                        "引用内容": citation_content,
-                        "验证状态": "未验证",
-                        "验证评分": citation_confidence * 0.8, # 降低评分
-                        "验证详情": "未找到相关搜索结果"
-                    })
-                    total_score += citation_confidence * 0.8
-                    verified_count += 1
-                    continue
+                    
+                    # 再尝试一次更宽松的搜索
+                    if len(search_text) > 30:
+                        shorter_text = search_text[:30]
+                        logger.info(f"尝试更短的搜索文本: {shorter_text}")
+                        search_results = search_with_searxng(shorter_text, num_results=3)
+                    
+                    # 如果仍然没有结果
+                    if not search_results or not search_results.get("results"):
+                        verification_results.append({
+                            "引用内容": citation_content,
+                            "验证状态": "未验证",
+                            "验证评分": citation_confidence * 0.8, # 降低评分
+                            "验证详情": "未找到相关搜索结果"
+                        })
+                        total_score += citation_confidence * 0.8
+                        verified_count += 1
+                        continue
                 
                 # 使用DeepSeek验证搜索结果
                 deepseek_verification = verify_citations_with_deepseek([citation], search_results)

@@ -19,3 +19,8 @@ saved_news/
 print_formatted_result
 myenv
 myenv.zip
+six.py
+search_services.py
+six-1.17.0.dist-info/
+python_dateutil-2.9.0.post0.dist-info/
+dateutil/
