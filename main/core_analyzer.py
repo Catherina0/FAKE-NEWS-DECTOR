@@ -122,6 +122,10 @@ def analyze_news_credibility(
         "分析过程": []  # 记录分析过程的关键步骤
     }
     
+    # 初始化正面和负面特征列表
+    positive_aspects = []
+    negative_aspects = []
+    
     # 使用各项分析方法获取评分
     scores = {}
     warnings = []

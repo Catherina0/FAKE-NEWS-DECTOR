@@ -209,12 +209,15 @@ def query_deepseek(prompt, max_retries=3):
             }
         ],
         "temperature": 0.3,  # 降低温度以获得更确定性的回答
-        "max_tokens": 4000,
-        "response_format": {"type": "json_object"}  # 始终要求返回JSON格式
+        "max_tokens": 4000
     }
     
-    # 移除原来的条件判断代码，始终使用JSON格式
-    logger.debug("始终启用 JSON 响应格式")
+    # 检查prompt中是否包含"json"关键词，如果包含才设置response_format
+    if "json" in prompt.lower():
+        logger.debug("检测到prompt中包含'json'关键词，启用JSON响应格式")
+        data["response_format"] = {"type": "json_object"}
+    else:
+        logger.debug("prompt中不包含'json'关键词，不设置JSON响应格式")
     
     logger.debug(f"DeepSeek API请求URL: {api_url}")
     logger.debug(f"DeepSeek API请求数据: {data}")
