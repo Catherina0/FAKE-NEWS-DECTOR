@@ -24,8 +24,8 @@ search_services.py
 six-1.17.0.dist-info/
 python_dateutil-2.9.0.post0.dist-info/
 dateutil/
-result_formatter.py.orig
-main/deepseek_api_error_1743476958.txt
+deepseek_api_error_1743476958.txt
 myenv.zip
+main.py.bak
 main/result_formatter.py.orig
-main/main.py.bak
+main/result_formatter.py.bak
