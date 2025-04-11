@@ -117,6 +117,7 @@ def parse_arguments():
     parser.add_argument('--quick', action='store_true', help='快速模式，跳过DeepSeek API分析')
     parser.add_argument('--save', action='store_true', help='保存新闻到本地文件夹')
     parser.add_argument('--save-dir', default='saved_news', help='保存新闻的文件夹路径')
+    parser.add_argument('--language', '--lang', default='zh', choices=['zh', 'en'], help='输出语言 (zh: 中文, en: 英文)')
     return parser.parse_args()
 
 def main():
@@ -223,14 +224,20 @@ def main():
     )
     
     # 使用格式化打印功能
-    print_formatted_result(result)
+    print_formatted_result(result, language=args.language)
 
     # 如果用户指定了保存新闻，调用save_news_to_local函数
     if args.save:
         if save_news_to_local(analysis_text, args.url, result, args.save_dir, image_paths):
-            print(f"\n新闻已保存到文件夹: {os.path.abspath(args.save_dir)}")
+            if args.language == 'zh':
+                print(f"\n新闻已保存到文件夹: {os.path.abspath(args.save_dir)}")
+            else:
+                print(f"\nNews saved to folder: {os.path.abspath(args.save_dir)}")
         else:
-            print("\n保存新闻失败，请查看日志了解详情。")
+            if args.language == 'zh':
+                print("\n保存新闻失败，请查看日志了解详情。")
+            else:
+                print("\nFailed to save news, please check the logs for details.")
 
 if __name__ == "__main__":
     main()

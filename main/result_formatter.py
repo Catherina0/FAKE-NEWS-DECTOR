@@ -27,16 +27,282 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 添加中英文翻译映射
+TRANSLATIONS = {
+    # 维度名称翻译
+    "内容真实性": {"en": "Content Truthfulness", "zh": "内容真实性"},
+    "信息准确性": {"en": "Information Accuracy", "zh": "信息准确性"},
+    "来源可靠性": {"en": "Source Reliability", "zh": "来源可靠性"},
+    "引用质量": {"en": "Citation Quality", "zh": "引用质量"},
+    "语言客观性": {"en": "Language Objectivity", "zh": "语言客观性"},
+    "逻辑连贯性": {"en": "Logical Coherence", "zh": "逻辑连贯性"},
+    "交叉验证": {"en": "Cross Validation", "zh": "交叉验证"},
+    
+    # 维度描述翻译
+    "内容的真实准确程度": {"en": "Accuracy of content", "zh": "内容的真实准确程度"},
+    "信息与事实的一致性": {"en": "Consistency of information with facts", "zh": "信息与事实的一致性"},
+    "信息来源的权威性": {"en": "Authority of information sources", "zh": "信息来源的权威性"},
+    "引用来源的质量": {"en": "Quality of citation sources", "zh": "引用来源的质量"},
+    "语言表达的客观程度": {"en": "Objectivity of language expression", "zh": "语言表达的客观程度"},
+    "内容的逻辑性": {"en": "Logical structure of content", "zh": "内容的逻辑性"},
+    "外部信息的验证确认": {"en": "Verification through external sources", "zh": "外部信息的验证确认"},
+    
+    # 评级翻译
+    "高度可信": {"en": "Highly Credible", "zh": "高度可信"},
+    "部分可信": {"en": "Partially Credible", "zh": "部分可信"},
+    "低度可信": {"en": "Low Credibility", "zh": "低度可信"},
+    "不可信": {"en": "Not Credible", "zh": "不可信"},
+    
+    # 评级描述翻译
+    "高度可信 (≥80%)": {"en": "Highly Credible (≥80%)", "zh": "高度可信 (≥80%)"},
+    "部分可信 (60%-80%)": {"en": "Partially Credible (60%-80%)", "zh": "部分可信 (60%-80%)"},
+    "低度可信 (40%-60%)": {"en": "Low Credibility (40%-60%)", "zh": "低度可信 (40%-60%)"},
+    "不可信 (<40%)": {"en": "Not Credible (<40%)", "zh": "不可信 (<40%)"},
+    
+    # 报告区块标题翻译
+    "新闻可信度分析报告": {"en": "News Credibility Analysis Report", "zh": "新闻可信度分析报告"},
+    "总体可信度评级": {"en": "Overall Credibility Rating", "zh": "总体可信度评级"},
+    "总分": {"en": "Total Score", "zh": "总分"},
+    "来源": {"en": "Source", "zh": "来源"},
+    "加权计算": {"en": "Weighted Calculation", "zh": "加权计算"},
+    "评级区间": {"en": "Rating Range", "zh": "评级区间"},
+    "评分构成分析": {"en": "Score Composition Analysis", "zh": "评分构成分析"},
+    "总体评估": {"en": "Overall Assessment", "zh": "总体评估"},
+    "内容真实性与准确性分析": {"en": "Content Truthfulness & Accuracy Analysis", "zh": "内容真实性与准确性分析"},
+    "AI生成内容检测": {"en": "AI-Generated Content Detection", "zh": "AI生成内容检测"},
+    "来源可靠性与引用分析": {"en": "Source Reliability & Citation Analysis", "zh": "来源可靠性与引用分析"},
+    "引用统计": {"en": "Citation Statistics", "zh": "引用统计"},
+    "语言与逻辑分析": {"en": "Language & Logic Analysis", "zh": "语言与逻辑分析"},
+    "交叉验证结果": {"en": "Cross-Validation Results", "zh": "交叉验证结果"},
+    "问题点分析": {"en": "Issue Analysis", "zh": "问题点分析"},
+    "系统警告": {"en": "System Warnings", "zh": "系统警告"},
+    "分析完成 - 感谢使用新闻可信度分析工具": {"en": "Analysis Complete - Thank You for Using the News Credibility Analysis Tool", "zh": "分析完成 - 感谢使用新闻可信度分析工具"},
+    
+    # 交叉验证部分
+    "交叉验证评估": {"en": "Cross-Validation Assessment", "zh": "交叉验证评估"},
+    "验证点分析": {"en": "Verification Points Analysis", "zh": "验证点分析"},
+    "验证点": {"en": "Verification Point", "zh": "验证点"},
+    "得分": {"en": "Score", "zh": "得分"},
+    "结论": {"en": "Conclusion", "zh": "结论"},
+    "搜索结果": {"en": "Search Results", "zh": "搜索结果"},
+    "相关信息摘要": {"en": "Related Information Summary", "zh": "相关信息摘要"},
+    "相关链接": {"en": "Related Links", "zh": "相关链接"},
+    "相关来源分析": {"en": "Related Source Analysis", "zh": "相关来源分析"},
+    "来源": {"en": "Source", "zh": "来源"},
+    "可信度": {"en": "Credibility", "zh": "可信度"},
+    "交叉验证总分": {"en": "Cross-Validation Total Score", "zh": "交叉验证总分"},
+    "验证结论": {"en": "Validation Conclusion", "zh": "验证结论"},
+    "时效性评估": {"en": "Timeliness Assessment", "zh": "时效性评估"},
+    "未知": {"en": "Unknown", "zh": "未知"},
+    "可信内容总结": {"en": "Credible Content Summary", "zh": "可信内容总结"},
+    "重要性": {"en": "Importance", "zh": "重要性"},
+    "总体得分": {"en": "Overall Score", "zh": "总体得分"},
+    "未知内容": {"en": "Unknown Content", "zh": "未知内容"},
+    "格式无效": {"en": "Invalid Format", "zh": "格式无效"},
+    
+    # 问题描述
+    "未发现明显问题": {"en": "No obvious issues found", "zh": "未发现明显问题"},
+    "建议：保持批判性思维，关注信息更新": {"en": "Suggestion: Maintain critical thinking and stay updated with information changes", "zh": "建议：保持批判性思维，关注信息更新"},
+    
+    # 贡献率
+    "贡献": {"en": "contribution", "zh": "贡献"},
+    "权重": {"en": "weight", "zh": "权重"},
+    "新闻可信度分析报告": {"en": "News Credibility Analysis Report", "zh": "新闻可信度分析报告"},
+    "总体可信度评级": {"en": "Overall Credibility Rating", "zh": "总体可信度评级"},
+    "总分": {"en": "Total Score", "zh": "总分"},
+    "来源": {"en": "Source", "zh": "来源"},
+    "评级区间": {"en": "Rating Range", "zh": "评级区间"},
+    "高度可信 (≥80%)": {"en": "Highly Credible (≥80%)", "zh": "高度可信 (≥80%)"},
+    "部分可信 (60%-80%)": {"en": "Partially Credible (60%-80%)", "zh": "部分可信 (60%-80%)"},
+    "低度可信 (40%-60%)": {"en": "Low Credibility (40%-60%)", "zh": "低度可信 (40%-60%)"},
+    "不可信 (<40%)": {"en": "Not Credible (<40%)", "zh": "不可信 (<40%)"},
+    "评分构成分析": {"en": "Score Composition Analysis", "zh": "评分构成分析"},
+    "内容真实性与准确性分析": {"en": "Content Truthfulness & Accuracy Analysis", "zh": "内容真实性与准确性分析"},
+    "AI生成内容检测": {"en": "AI-Generated Content Detection", "zh": "AI生成内容检测"},
+    "主要评分指标": {"en": "Main Scoring Metrics", "zh": "主要评分指标"},
+    "细分评分指标": {"en": "Detailed Scoring Metrics", "zh": "细分评分指标"},
+    "来源可靠性与引用分析": {"en": "Source Reliability & Citation Analysis", "zh": "来源可靠性与引用分析"},
+    "引用统计与评估": {"en": "Citation Statistics & Evaluation", "zh": "引用统计与评估"},
+    "来源评分与分析": {"en": "Source Scoring & Analysis", "zh": "来源评分与分析"},
+    "语言与逻辑分析": {"en": "Language & Logic Analysis", "zh": "语言与逻辑分析"},
+    "语言表达评分": {"en": "Language Expression Scoring", "zh": "语言表达评分"},
+    "问题点分析": {"en": "Issue Analysis", "zh": "问题点分析"},
+    "未发现明显问题": {"en": "No obvious issues detected", "zh": "未发现明显问题"},
+    "建议：保持批判性思维，关注信息更新": {"en": "Recommendation: Maintain critical thinking, stay informed with updates", "zh": "建议：保持批判性思维，关注信息更新"},
+    "未找到详细的来源分析数据": {"en": "No detailed source analysis data found", "zh": "未找到详细的来源分析数据"},
+    "建议：进行更详细的来源分析以提高评估准确性": {"en": "Recommendation: Conduct more detailed source analysis to improve assessment accuracy", "zh": "建议：进行更详细的来源分析以提高评估准确性"},
+    "错误：无法获取本地新闻验证数据": {"en": "Error: Unable to retrieve local news verification data", "zh": "错误：无法获取本地新闻验证数据"},
+    "▶ 逻辑分析": {"en": "▶ Logic Analysis", "zh": "▶ 逻辑分析"},
+    "错误：无法获取逻辑分析数据": {"en": "Error: Unable to retrieve logic analysis data", "zh": "错误：无法获取逻辑分析数据"},
+    "▶ 交叉验证": {"en": "▶ Cross Validation", "zh": "▶ 交叉验证"},
+    "错误：无法获取交叉验证数据": {"en": "Error: Unable to retrieve cross validation data", "zh": "错误：无法获取交叉验证数据"},
+    "无": {"en": "None", "zh": "无"},
+    "有限": {"en": "Limited", "zh": "有限"},
+    "适量": {"en": "Adequate", "zh": "适量"},
+    "充足": {"en": "Sufficient", "zh": "充足"},
+    "无明确引用": {"en": "No clear citations", "zh": "无明确引用"},
+    "较少": {"en": "Few", "zh": "较少"},
+    "个": {"en": "", "zh": "个"},
+    "无法评估": {"en": "Unable to assess", "zh": "无法评估"},
+    "单一": {"en": "Single", "zh": "单一"},
+    "一般": {"en": "Average", "zh": "一般"},
+    "多样": {"en": "Diverse", "zh": "多样"},
+    "低": {"en": "Low", "zh": "低"},
+    "较高": {"en": "High", "zh": "较高"},
+    "高": {"en": "Very High", "zh": "高"},
+    "严重": {"en": "Severe", "zh": "严重"},
+    # 删除有问题的条目
+    
+    # 分析维度
+    "内容真实性": {"en": "Content Truthfulness", "zh": "内容真实性"},
+    "信息准确性": {"en": "Information Accuracy", "zh": "信息准确性"},
+    "来源可靠性": {"en": "Source Reliability", "zh": "来源可靠性"},
+    "引用质量": {"en": "Citation Quality", "zh": "引用质量"},
+    "语言客观性": {"en": "Language Objectivity", "zh": "语言客观性"},
+    "逻辑连贯性": {"en": "Logical Coherence", "zh": "逻辑连贯性"},
+    
+    # 分析维度描述
+    "新闻内容与事实的符合程度": {"en": "Alignment of news content with facts", "zh": "新闻内容与事实的符合程度"},
+    "信息的精确性和完整性": {"en": "Precision and completeness of information", "zh": "信息的精确性和完整性"},
+    "信息来源的权威性和可信度": {"en": "Authority and credibility of information sources", "zh": "信息来源的权威性和可信度"},
+    "引用的准确性和相关性": {"en": "Accuracy and relevance of citations", "zh": "引用的准确性和相关性"},
+    "语言表达的中立性和客观性": {"en": "Neutrality and objectivity of language expression", "zh": "语言表达的中立性和客观性"},
+    "内容的逻辑性和连贯性": {"en": "Logic and coherence of content", "zh": "内容的逻辑性和连贯性"},
+    
+    # 分组标题
+    "内容真实性相关指标": {"en": "Content Truthfulness Metrics", "zh": "内容真实性相关指标"},
+    "信息准确性相关指标": {"en": "Information Accuracy Metrics", "zh": "信息准确性相关指标"},
+    "来源可靠性相关指标": {"en": "Source Reliability Metrics", "zh": "来源可靠性相关指标"},
+    "引用质量相关指标": {"en": "Citation Quality Metrics", "zh": "引用质量相关指标"},
+    "语言客观性相关指标": {"en": "Language Objectivity Metrics", "zh": "语言客观性相关指标"},
+    "逻辑连贯性相关指标": {"en": "Logical Coherence Metrics", "zh": "逻辑连贯性相关指标"},
+    
+    # AI生成内容分析
+    "人类写作特征评分": {"en": "Human Writing Characteristics Score", "zh": "人类写作特征评分"},
+    "文本高度符合人类写作特征，AI生成可能性很低": {"en": "Text highly matches human writing characteristics, very low probability of AI generation", "zh": "文本高度符合人类写作特征，AI生成可能性很低"},
+    "AI生成概率": {"en": "AI Generation Probability", "zh": "AI生成概率"},
+    "AI特征详细分析": {"en": "AI Features Detailed Analysis", "zh": "AI特征详细分析"},
+    "表达模式": {"en": "Expression Patterns", "zh": "表达模式"},
+    "词汇多样性": {"en": "Vocabulary Diversity", "zh": "词汇多样性"},
+    "句子变化": {"en": "Sentence Variation", "zh": "句子变化"},
+    "上下文连贯性": {"en": "Contextual Coherence", "zh": "上下文连贯性"},
+    "人类特征": {"en": "Human Characteristics", "zh": "人类特征"},
+    "表达模式 (句式结构的人类特征)": {"en": "Expression Patterns (human characteristics in sentence structure)", "zh": "表达模式 (句式结构的人类特征)"},
+    "词汇多样性 (用词丰富度的人类特征)": {"en": "Vocabulary Diversity (richness of word usage)", "zh": "词汇多样性 (用词丰富度的人类特征)"},
+    "句子变化 (句式变化多样性的人类特征)": {"en": "Sentence Variation (diversity in sentence patterns)", "zh": "句子变化 (句式变化多样性的人类特征)"},
+    "上下文连贯性 (逻辑流畅度的人类特征)": {"en": "Contextual Coherence (logical flow characteristics)", "zh": "上下文连贯性 (逻辑流畅度的人类特征)"},
+    "人类特征 (文本中的人类思维特征)": {"en": "Human Characteristics (human thinking patterns in text)", "zh": "人类特征 (文本中的人类思维特征)"},
+    
+    # 引用分析
+    "引用特征分析": {"en": "Citation Feature Analysis", "zh": "引用特征分析"},
+    "引用准确性": {"en": "Citation Accuracy", "zh": "引用准确性"},
+    "引用内容与原始资料的一致程度": {"en": "Consistency of citations with original sources", "zh": "引用内容与原始资料的一致程度"},
+    "引用相关性": {"en": "Citation Relevance", "zh": "引用相关性"},
+    "引用与文章主题的相关程度": {"en": "Relevance of citations to the article topic", "zh": "引用与文章主题的相关程度"},
+    "来源权威性": {"en": "Source Authority", "zh": "来源权威性"},
+    "引用来源的专业性与公信力": {"en": "Professionalism and credibility of cited sources", "zh": "引用来源的专业性与公信力"},
+    "来源多样性": {"en": "Source Diversity", "zh": "来源多样性"},
+    "引用来源的多元化程度": {"en": "Diversity level of cited sources", "zh": "引用来源的多元化程度"},
+    "时效性": {"en": "Timeliness", "zh": "时效性"},
+    "引用内容的时效性与更新程度": {"en": "Timeliness and update status of cited content", "zh": "引用内容的时效性与更新程度"},
+    "来源类型分析": {"en": "Source Type Analysis", "zh": "来源类型分析"},
+    "权威媒体": {"en": "Authoritative Media", "zh": "权威媒体"},
+    "学术期刊": {"en": "Academic Journals", "zh": "学术期刊"},
+    "专业报告": {"en": "Professional Reports", "zh": "专业报告"},
+    "官方网站": {"en": "Official Websites", "zh": "官方网站"},
+    "估计引用总数": {"en": "Estimated Total Citations", "zh": "估计引用总数"},
+    "估计有效引用": {"en": "Estimated Effective Citations", "zh": "估计有效引用"},
+    "有效率": {"en": "Effectiveness Rate", "zh": "有效率"},
+    "估计可靠来源数": {"en": "Estimated Reliable Sources", "zh": "估计可靠来源数"},
+    "可靠比例": {"en": "Reliability Ratio", "zh": "可靠比例"},
+    "来源高度可靠，包含权威或官方信息": {"en": "Sources highly reliable, containing authoritative or official information", "zh": "来源高度可靠，包含权威或官方信息"},
+    "引用质量高，引用准确且来源可靠": {"en": "High citation quality, citations are accurate and sources are reliable", "zh": "引用质量高，引用准确且来源可靠"},
+    "来源基本可靠，但可能包含部分未经验证信息": {"en": "Sources generally reliable, but may contain some unverified information", "zh": "来源基本可靠，但可能包含部分未经验证信息"},
+    "来源可靠性存疑，建议核实关键信息": {"en": "Source reliability is questionable, verification of key information is recommended", "zh": "来源可靠性存疑，建议核实关键信息"},
+    "引用质量一般，部分引用需要核实": {"en": "Citation quality is average, some citations need verification", "zh": "引用质量一般，部分引用需要核实"},
+    "引用质量差，多数引用无法验证": {"en": "Poor citation quality, most citations cannot be verified", "zh": "引用质量差，多数引用无法验证"},
+    "数据无效": {"en": "Invalid data", "zh": "数据无效"},
+    "新闻媒体": {"en": "News Media", "zh": "新闻媒体"},
+    "行业网站": {"en": "Industry Websites", "zh": "行业网站"},
+    "专业博客": {"en": "Professional Blogs", "zh": "专业博客"},
+    "政府公告": {"en": "Government Announcements", "zh": "政府公告"},
+    "网络媒体": {"en": "Online Media", "zh": "网络媒体"},
+    "个人博客": {"en": "Personal Blogs", "zh": "个人博客"},
+    "社交媒体": {"en": "Social Media", "zh": "社交媒体"},
+    "新闻聚合": {"en": "News Aggregators", "zh": "新闻聚合"},
+    "事实核查": {"en": "Fact Checking", "zh": "事实核查"},
+    "虚构成分": {"en": "Fictional Elements", "zh": "虚构成分"},
+    "时间准确性": {"en": "Time Accuracy", "zh": "时间准确性"},
+    "地点准确性": {"en": "Location Accuracy", "zh": "地点准确性"},
+    "人物真实性": {"en": "Character Authenticity", "zh": "人物真实性"},
+    "数据准确性": {"en": "Data Accuracy", "zh": "数据准确性"},
+    "细节一致性": {"en": "Detail Consistency", "zh": "细节一致性"},
+    "专业术语": {"en": "Technical Terminology", "zh": "专业术语"},
+    "背景信息": {"en": "Background Information", "zh": "背景信息"},
+    "信息来源": {"en": "Information Sources", "zh": "信息来源"},
+    "来源权威性": {"en": "Source Authority", "zh": "来源权威性"},
+    "多源验证": {"en": "Multi-source Verification", "zh": "多源验证"},
+    "引用规范": {"en": "Citation Standards", "zh": "引用规范"},
+    "情感色彩": {"en": "Emotional Coloring", "zh": "情感色彩"},
+    "偏见检测": {"en": "Bias Detection", "zh": "偏见检测"},
+    "平衡报道": {"en": "Balanced Reporting", "zh": "平衡报道"},
+    "修辞使用": {"en": "Rhetorical Use", "zh": "修辞使用"},
+    "因果关系": {"en": "Causal Relationships", "zh": "因果关系"},
+    "论证完整性": {"en": "Argument Completeness", "zh": "论证完整性"},
+    "结构清晰": {"en": "Structure Clarity", "zh": "结构清晰"},
+    "推理合理": {"en": "Reasoning Soundness", "zh": "推理合理"},
+    "引用多样性": {"en": "Citation Diversity", "zh": "引用多样性"},
+    "引用时效性": {"en": "Citation Timeliness", "zh": "引用时效性"},
+    "引用相关性": {"en": "Citation Relevance", "zh": "引用相关性"},
+    "权重": {"en": "Weight", "zh": "权重"},
+    "AI特征详细分析": {"en": "AI Features Detailed Analysis", "zh": "AI特征详细分析"},
+    "AI生成概率": {"en": "AI Generation Probability", "zh": "AI生成概率"},
+    "人类写作特征评分": {"en": "Human Writing Characteristics Score", "zh": "人类写作特征评分"},
+    "分析结论": {"en": "Analysis Conclusion", "zh": "分析结论"},
+    "推断结果": {"en": "Inference Result", "zh": "推断结果"},
+    "文本很可能由AI生成": {"en": "Text very likely generated by AI", "zh": "文本很可能由AI生成"},
+    "文本可能是AI辅助创作": {"en": "Text possibly AI-assisted creation", "zh": "文本可能是AI辅助创作"},
+    "文本具有较强的人类写作特征": {"en": "Text has strong human writing characteristics", "zh": "文本具有较强的人类写作特征"},
+    "未找到明确的AI生成内容评分或结论": {"en": "No clear AI generation content score or conclusion found", "zh": "未找到明确的AI生成内容评分或结论"},
+    "以下为原始AI检测数据的关键字段": {"en": "Key fields from original AI detection data below", "zh": "以下为原始AI检测数据的关键字段"},
+    "无法评估AI生成可能性": {"en": "Unable to evaluate AI generation probability", "zh": "无法评估AI生成可能性"},
+    "文本高度符合人类写作特征，AI生成可能性很低": {"en": "Text highly matches human writing characteristics, very low probability of AI generation", "zh": "文本高度符合人类写作特征，AI生成可能性很低"},
+    "文本整体符合人类写作特征，AI生成可能性较低": {"en": "Text generally matches human writing characteristics, low probability of AI generation", "zh": "文本整体符合人类写作特征，AI生成可能性较低"},
+    "文本有部分AI生成特征，但仍保留人类写作风格": {"en": "Text shows some AI generation features but retains human writing style", "zh": "文本有部分AI生成特征，但仍保留人类写作风格"},
+    "文本呈现明显的AI生成特征，可能是AI辅助创作": {"en": "Text presents clear AI generation features, possibly AI-assisted creation", "zh": "文本呈现明显的AI生成特征，可能是AI辅助创作"},
+    "文本极有可能由AI生成，人类写作特征极少": {"en": "Text is very likely generated by AI, with minimal human writing characteristics", "zh": "文本极有可能由AI生成，人类写作特征极少"},
+    "权重": {"en": "Weight", "zh": "权重"},
+}
+
+def get_translation(text, language='zh'):
+    """获取文本的翻译，如果没有翻译则返回原文本"""
+    if language == 'zh':
+        return text
+    
+    if text in TRANSLATIONS:
+        return TRANSLATIONS[text].get(language, text)
+    
+    # 如果找不到直接匹配，尝试在值中查找
+    for key, translations in TRANSLATIONS.items():
+        if text == key or text == translations.get('zh'):
+            return translations.get(language, text)
+    
+    return text
+
+# 添加别名使t调用get_translation
+t = get_translation
+
 def format_score(score: float) -> str:
     """格式化评分为两位小数的字符串"""
     return f"{float(score):.2f}"
 
-def get_credibility_summary(score: float) -> str:
+def get_credibility_summary(score: float, language='zh') -> str:
     """
     根据可信度评分生成简短摘要
     
     参数:
         score (float): 可信度评分 (0-1)
+        language (str): 输出语言 ('zh' 或 'en')
     
     返回:
         str: 可信度摘要
@@ -44,23 +310,24 @@ def get_credibility_summary(score: float) -> str:
     try:
         score = float(score)
     except (TypeError, ValueError):
-        return "无法评估：评分数据异常"
+        return "无法评估：评分数据异常" if language == 'zh' else "Unable to evaluate: Abnormal score data"
     
     if score >= 0.8:
-        return "新闻内容可靠性高，论据充分，信息准确，来源可靠"
+        return "新闻内容可靠性高，论据充分，信息准确，来源可靠" if language == 'zh' else "The news content is highly reliable with sufficient arguments, accurate information, and reliable sources"
     elif score >= 0.6:
-        return "新闻基本可信，但建议核实关键信息"
+        return "新闻基本可信，但建议核实关键信息" if language == 'zh' else "The news is generally credible, but verification of key information is recommended"
     elif score >= 0.4:
-        return "新闻可信度存在问题，建议谨慎对待"
+        return "新闻可信度存在问题，建议谨慎对待" if language == 'zh' else "There are credibility issues with the news, caution is advised"
     else:
-        return "新闻可信度严重不足，可能包含虚假或误导信息"
+        return "新闻可信度严重不足，可能包含虚假或误导信息" if language == 'zh' else "The news lacks credibility significantly and may contain false or misleading information"
 
-def get_ai_content_description(score: float) -> str:
+def get_ai_content_description(score: float, language='zh') -> str:
     """
     根据AI生成内容评分提供描述
     
     参数:
         score (float): AI生成评分 (0-1，越高表示越像人类写作)
+        language (str): 输出语言 ('zh' 或 'en')
     
     返回:
         str: 描述性文本
@@ -68,18 +335,18 @@ def get_ai_content_description(score: float) -> str:
     try:
         score = float(score)
     except (TypeError, ValueError):
-        return "无法评估AI生成可能性"
+        return t("无法评估AI生成可能性") if language == 'zh' else t("Unable to evaluate AI generation probability")
     
     if score >= 0.85:
-        return "文本高度符合人类写作特征，AI生成可能性很低"
+        return t("文本高度符合人类写作特征，AI生成可能性很低")
     elif score >= 0.7:
-        return "文本整体符合人类写作特征，AI生成可能性较低"
+        return t("文本整体符合人类写作特征，AI生成可能性较低")
     elif score >= 0.5:
-        return "文本有部分AI生成特征，但仍保留人类写作风格"
+        return t("文本有部分AI生成特征，但仍保留人类写作风格")
     elif score >= 0.3:
-        return "文本呈现明显的AI生成特征，可能是AI辅助创作"
+        return t("文本呈现明显的AI生成特征，可能是AI辅助创作")
     else:
-        return "文本极有可能由AI生成，人类写作特征极少"
+        return t("文本极有可能由AI生成，人类写作特征极少")
 
 def get_rating_emoji(score):
     """根据评分返回对应的emoji和评级"""
@@ -113,16 +380,24 @@ def get_progress_bar(score, width=10):
     filled = int(score_float * width)
     return f"{'█' * filled}{'░' * (width - filled)}"
 
-def get_credibility_rating(score):
+def get_credibility_rating(score, language='zh'):
     """根据可信度评分返回评级"""
     if score >= 0.8:
-        return f"{TITLE_COLOR}高度可信 🌟🌟🌟🌟{RESET_COLOR}", "高"
+        rating_text = "高度可信 🌟🌟🌟🌟" if language == 'zh' else "Highly Credible 🌟🌟🌟🌟"
+        rating_level = "高" if language == 'zh' else "High"
+        return f"{TITLE_COLOR}{rating_text}{RESET_COLOR}", rating_level
     elif score >= 0.6:
-        return f"{SUCCESS_COLOR}部分可信 🌟🌟{RESET_COLOR}", "中"
+        rating_text = "部分可信 🌟🌟" if language == 'zh' else "Partially Credible 🌟🌟"
+        rating_level = "中" if language == 'zh' else "Medium"
+        return f"{SUCCESS_COLOR}{rating_text}{RESET_COLOR}", rating_level
     elif score >= 0.4:
-        return f"{WARNING_COLOR}低度可信 🌟{RESET_COLOR}", "低" 
+        rating_text = "低度可信 🌟" if language == 'zh' else "Low Credibility 🌟"
+        rating_level = "低" if language == 'zh' else "Low"
+        return f"{WARNING_COLOR}{rating_text}{RESET_COLOR}", rating_level 
     else:
-        return f"{ERROR_COLOR}不可信 ❗{RESET_COLOR}", "极低"
+        rating_text = "不可信 ❗" if language == 'zh' else "Not Credible ❗"
+        rating_level = "极低" if language == 'zh' else "Very Low"
+        return f"{ERROR_COLOR}{rating_text}{RESET_COLOR}", rating_level
 
 def validate_score(score: Any, source: str = "未知") -> float:
     """验证并转换评分"""
@@ -408,7 +683,7 @@ def calculate_weighted_score(main_scores: dict, cross_validation_data: dict = No
     logger.info(f"计算得到加权总分: {final_score:.2f} (原始加权平均: {weighted_sum/total_weight:.2f})")
     return final_score, used_weights, dimension_scores
 
-def analyze_problems(result: dict, total_score: float, main_scores: dict, cross_validation_data: dict) -> list:
+def analyze_problems(result: dict, total_score: float, main_scores: dict, cross_validation_data: dict, language: str = 'zh') -> list:
     """
     AI分析存在的问题
     
@@ -417,49 +692,61 @@ def analyze_problems(result: dict, total_score: float, main_scores: dict, cross_
         total_score: 总分
         main_scores: 主要维度评分
         cross_validation_data: 交叉验证数据
+        language: 输出语言 ('zh': 中文, 'en': 英文)
     
     返回:
         list: 问题列表，每个问题是一个字典，包含严重程度、描述和建议
     """
     problems = []
     
+    # 使用翻译函数
+    def t(text):
+        return get_translation(text, language)
+    
     # 1. 分析总体可信度
     if total_score < 0.4:
         problems.append({
-            "severity": "严重",
-            "type": "总体可信度",
-            "description": f"新闻整体可信度极低 ({total_score:.1%})",
-            "suggestion": "建议谨慎对待该新闻内容，需要大量额外验证",
+            "severity": t("严重"),
+            "type": t("总体可信度"),
+            "description": t("新闻整体可信度极低") + f" ({total_score:.1%})",
+            "suggestion": t("建议谨慎对待该新闻内容，需要大量额外验证") if language == 'zh' else "It is recommended to treat this news content with caution and requires substantial additional verification",
             "color": ERROR_COLOR
         })
     elif total_score < 0.6:
         problems.append({
-            "severity": "中等",
-            "type": "总体可信度",
-            "description": f"新闻可信度较低 ({total_score:.1%})",
-            "suggestion": "建议进一步核实关键信息",
+            "severity": t("中等"),
+            "type": t("总体可信度"),
+            "description": t("新闻可信度较低") + f" ({total_score:.1%})",
+            "suggestion": t("建议进一步核实关键信息") if language == 'zh' else "It is recommended to further verify key information",
             "color": WARNING_COLOR
         })
     
     # 2. 分析各维度评分
     dimension_thresholds = {
-        "内容真实性": (0.6, "核实新闻中的关键事实和数据"),
-        "信息准确性": (0.6, "检查信息的准确性和完整性"),
-        "来源可靠性": (0.6, "验证信息来源的权威性"),
-        "引用质量": (0.6, "检查引用的准确性和可靠性"),
-        "语言客观性": (0.5, "注意可能存在的主观偏见"),
-        "逻辑连贯性": (0.5, "检查内容的逻辑性和连贯性")
+        t("内容真实性"): (0.6, t("核实新闻中的关键事实和数据") if language == 'zh' else "Verify key facts and data in the news"),
+        t("信息准确性"): (0.6, t("检查信息的准确性和完整性") if language == 'zh' else "Check the accuracy and completeness of information"),
+        t("来源可靠性"): (0.6, t("验证信息来源的权威性") if language == 'zh' else "Verify the authority of information sources"),
+        t("引用质量"): (0.6, t("检查引用的准确性和可靠性") if language == 'zh' else "Check the accuracy and reliability of citations"),
+        t("语言客观性"): (0.5, t("注意可能存在的主观偏见") if language == 'zh' else "Be aware of potential subjective bias"),
+        t("逻辑连贯性"): (0.5, t("检查内容的逻辑性和连贯性") if language == 'zh' else "Check the logic and coherence of the content")
     }
     
     for dim, (threshold, suggestion) in dimension_thresholds.items():
-        if dim in main_scores:
-            score = float(main_scores[dim])
+        # 根据翻译后的维度名称查找对应的原始键
+        original_dim = None
+        for key in main_scores.keys():
+            if t(key) == dim:
+                original_dim = key
+                break
+        
+        if original_dim and original_dim in main_scores:
+            score = float(main_scores[original_dim])
             if score < threshold:
-                severity = "严重" if score < 0.4 else "中等"
+                severity = t("严重") if score < 0.4 else t("中等")
                 problems.append({
                     "severity": severity,
                     "type": dim,
-                    "description": f"{dim}评分过低 ({score:.1%})",
+                    "description": f"{dim}{t('评分过低')} ({score:.1%})",
                     "suggestion": suggestion,
                     "color": ERROR_COLOR if score < 0.4 else WARNING_COLOR
                 })
@@ -601,15 +888,27 @@ def print_problems_section(problems: list):
         print(f"{color}    - {problem['description']}{RESET_COLOR}")
         print(f"{color}    - 建议：{problem['suggestion']}{RESET_COLOR}")
 
-def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) -> None:
+def print_formatted_result(result: Dict[str, Any], colored_output: bool = True, language: str = 'zh') -> None:
     """
     格式化打印分析结果
     
     参数:
-        result (Dict[str, Any]): 分析结果字典
-        colored_output (bool): 是否使用彩色输出
+        result: 分析结果字典
+        colored_output: 是否启用彩色输出
+        language: 输出语言 ('zh': 中文, 'en': 英文)
     """
+    if not result:
+        if language == 'zh':
+            print(f"{ERROR_COLOR}错误: 没有可显示的结果{RESET_COLOR}")
+        else:
+            print(f"{ERROR_COLOR}Error: No results to display{RESET_COLOR}")
+        return
+    
     try:
+        # 使用翻译函数将关键文本转换为指定语言
+        def t(text):
+            return get_translation(text, language)
+        
         logger.info("开始格式化分析结果")
         logger.debug(f"输入数据: {result}")
         
@@ -728,47 +1027,53 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
         
         # 顶部横幅
         print(f"\n{HEADER_COLOR}{'=' * 70}{RESET_COLOR}")
-        print(f"{HEADER_COLOR}{'📊 新闻可信度分析报告 📊':^70}{RESET_COLOR}")
+        print(f"{HEADER_COLOR}{t('新闻可信度分析报告'):^70}{RESET_COLOR}")
         print(f"{HEADER_COLOR}{'=' * 70}{RESET_COLOR}")
         
         # 总评部分
         print(f"\n{TITLE_COLOR}{'▓' * 70}{RESET_COLOR}")
-        print(f"{TITLE_COLOR}{'总体可信度评级: ' + rating_text:^70}{RESET_COLOR}")
-        print(f"{TITLE_COLOR}{f'总分: {total_score_pct:.1f}% (来源: {score_source})':^70}{RESET_COLOR}")
+        print(f"{TITLE_COLOR}{t('总体可信度评级') + ': ' + rating_text:^70}{RESET_COLOR}")
+        source_text = t('来源')
+        score_source = t(score_source)
+        print(f"{TITLE_COLOR}{t('总分') + f': {total_score_pct:.1f}% ({source_text}: {score_source})':^70}{RESET_COLOR}")
         
         # 添加评级解释
         rating_explanation = ""
         if total_score >= 0.8:
-            rating_explanation = f"高度可信 (≥80%)"
+            rating_explanation = t("高度可信 (≥80%)")
         elif total_score >= 0.6:
-            rating_explanation = f"部分可信 (60%-80%)"
+            rating_explanation = t("部分可信 (60%-80%)")
         elif total_score >= 0.4:
-            rating_explanation = f"低度可信 (40%-60%)"
+            rating_explanation = t("低度可信 (40%-60%)")
         else:
-            rating_explanation = f"不可信 (<40%)"
+            rating_explanation = t("不可信 (<40%)")
         
-        print(f"{TITLE_COLOR}{f'评级区间: {rating_explanation}':^70}{RESET_COLOR}")
+        # 修复总体可信度评级区间显示
+        print(f"{TITLE_COLOR}{t('评级区间') + f': {rating_explanation}':^70}{RESET_COLOR}")
         print(f"{TITLE_COLOR}{'▓' * 70}{RESET_COLOR}")
         
         # 添加评分权重和贡献明细
         if weights and isinstance(weights, dict) and total_score_pct > 0:
-            print(f"\n{SECTION_COLOR}评分构成分析:{RESET_COLOR}")
+            print(f"\n{SECTION_COLOR}{t('评分构成分析')}:{RESET_COLOR}")
             
             # 准备维度排序和显示
             dimension_display = {
-                "内容真实性": "内容的真实准确程度",
-                "信息准确性": "信息与事实的一致性",
-                "来源可靠性": "信息来源的权威性",
-                "引用质量": "引用来源的质量",
-                "语言客观性": "语言表达的客观程度",
-                "逻辑连贯性": "内容的逻辑性",
-                "交叉验证": "外部信息的验证确认"
+                t("内容真实性"): t("内容的真实准确程度"),
+                t("信息准确性"): t("信息与事实的一致性"),
+                t("来源可靠性"): t("信息来源的权威性"),
+                t("引用质量"): t("引用来源的质量"),
+                t("语言客观性"): t("语言表达的客观程度"),
+                t("逻辑连贯性"): t("内容的逻辑性"),
+                t("交叉验证"): t("外部信息的验证确认")
             }
             
             # 按照权重从大到小排序
             sorted_weights = sorted(weights.items(), key=lambda x: x[1], reverse=True)
             
             for dimension, weight in sorted_weights:
+                # 翻译维度名称
+                dimension_translated = t(dimension)
+                
                 # 使用dimension_scores中的分数（包含了实际用于计算总分的值）
                 if dimension in dimension_scores:
                     # 计算该维度对总分的贡献
@@ -779,8 +1084,10 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                     color = SUCCESS_COLOR if contribution >= 25 else (DETAIL_COLOR if contribution >= 15 else NEUTRAL_COLOR)
                     
                     # 显示维度评分和贡献
-                    dimension_desc = dimension_display.get(dimension, dimension)
-                    print(f"{color}  • {dimension}: {score:.2f} × 权重{weight:.2f} = {score*weight:.2f} (贡献{contribution:.1f}%){RESET_COLOR}")
+                    dimension_desc = dimension_display.get(dimension_translated, dimension_translated)
+                    weight_text = t("权重")
+                    contrib_text = t("贡献")
+                    print(f"{color}  • {dimension_translated}: {score:.2f} × {weight_text}{weight:.2f} = {score*weight:.2f} ({contrib_text}{contribution:.1f}%){RESET_COLOR}")
                     print(f"{NEUTRAL_COLOR}    - {dimension_desc}{RESET_COLOR}")
                 else:
                     # 如果在dimension_scores中找不到，使用旧方法
@@ -813,17 +1120,17 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                         print(f"{NEUTRAL_COLOR}    - 外部信息的验证确认{RESET_COLOR}")
         
         # 获取摘要
-        summary = get_credibility_summary(total_score)
+        summary = get_credibility_summary(total_score, language)
         logger.debug(f"生成总体评估摘要: {summary}")
-        print(f"\n{SECTION_COLOR}〖 总体评估 〗{RESET_COLOR}")
+        print(f"\n{SECTION_COLOR}〖 {t('总体评估')} 〗{RESET_COLOR}")
         print(f"{DETAIL_COLOR}{summary}{RESET_COLOR}")
         
         # 一、内容真实性与准确性分析
-        print(f"\n{SUBHEADER_COLOR}一、内容真实性与准确性分析{RESET_COLOR}")
+        print(f"\n{SUBHEADER_COLOR}{('一、' if language == 'zh' else '1. ')}{t('内容真实性与准确性分析')}{RESET_COLOR}")
         print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
         
         # AI生成内容检测部分
-        print(f"\n{SECTION_COLOR}1. AI生成内容检测:{RESET_COLOR}")
+        print(f"\n{SECTION_COLOR}1. {t('AI生成内容检测')}:{RESET_COLOR}")
         if ai_content_data and isinstance(ai_content_data, dict):
             try:
                 # 初始化ai_score变量
@@ -853,12 +1160,12 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                     print(f"{ai_prob_color}  • AI生成概率: {ai_probability:.2f} {get_progress_bar(ai_probability)}{RESET_COLOR}")
                     
                     # 显示详细特征评分
-                    print(f"\n{SECTION_COLOR}  AI特征详细分析:{RESET_COLOR}")
+                    print(f"\n{SECTION_COLOR}  {t('AI特征详细分析')}:{RESET_COLOR}")
                     for key, score in detailed_scores.items():
                         if isinstance(score, (int, float)) and 0 <= float(score) <= 1:
                             score_float = float(score)
                             score_color = SUCCESS_COLOR if score_float >= 0.7 else (WARNING_COLOR if score_float >= 0.5 else ERROR_COLOR)
-                            print(f"{score_color}    • {key}: {score_float:.2f} {get_progress_bar(score_float)}{RESET_COLOR}")
+                            print(f"{score_color}    • {t(key)}: {score_float:.2f} {get_progress_bar(score_float)}{RESET_COLOR}")
             except Exception as e:
                 logger.error(f"提取AI生成内容评分时出错: {str(e)}")
                 ai_score = None
@@ -915,7 +1222,12 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                     # 添加AI生成概率
                     ai_probability = max(0, min(1, 1 - ai_score_float))
                     ai_prob_color = SUCCESS_COLOR if ai_probability <= 0.3 else (WARNING_COLOR if ai_probability <= 0.5 else ERROR_COLOR)
-                    print(f"{ai_prob_color}  • AI生成概率: {ai_probability:.1%}{RESET_COLOR}")
+                    
+                    # 在英文模式下使用百分比格式，中文模式下保留原格式
+                    if language == 'zh':
+                        print(f"{ai_prob_color}  • {t('AI生成概率')}: {ai_probability:.1%}{RESET_COLOR}")
+                    else:
+                        print(f"{ai_prob_color}  • {t('AI生成概率')}: {ai_probability*100:.1f}%{RESET_COLOR}")
                 except ValueError:
                     logger.warning(f"AI生成内容评分无效: {ai_score}")
                     print(f"{ERROR_COLOR}  • AI生成内容评分无效{RESET_COLOR}")
@@ -935,14 +1247,14 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                         # 尝试从结论中推断AI生成可能性
                         if isinstance(conclusion, str):
                             if any(term in conclusion.lower() for term in ["人工智能生成", "ai生成", "机器生成", "很可能是ai", "生成式ai"]):
-                                print(f"{WARNING_COLOR}  • 推断结果: 文本很可能由AI生成{RESET_COLOR}")
+                                print(f"{WARNING_COLOR}  • {t('推断结果')}: {t('文本很可能由AI生成')}{RESET_COLOR}")
                             elif any(term in conclusion.lower() for term in ["部分特征", "混合特征", "ai辅助"]):
-                                print(f"{WARNING_COLOR}  • 推断结果: 文本可能是AI辅助创作{RESET_COLOR}")
+                                print(f"{WARNING_COLOR}  • {t('推断结果')}: {t('文本可能是AI辅助创作')}{RESET_COLOR}")
                             elif any(term in conclusion.lower() for term in ["人类特征", "人工撰写", "真实作者"]):
-                                print(f"{SUCCESS_COLOR}  • 推断结果: 文本具有较强的人类写作特征{RESET_COLOR}")
+                                print(f"{SUCCESS_COLOR}  • {t('推断结果')}: {t('文本具有较强的人类写作特征')}{RESET_COLOR}")
                     else:
-                        print(f"{WARNING_COLOR}  • 未找到明确的AI生成内容评分或结论{RESET_COLOR}")
-                        print(f"{DETAIL_COLOR}  • 以下为原始AI检测数据的关键字段:{RESET_COLOR}")
+                        print(f"{WARNING_COLOR}  • {t('未找到明确的AI生成内容评分或结论')}{RESET_COLOR}")
+                        print(f"{DETAIL_COLOR}  • {t('以下为原始AI检测数据的关键字段')}:{RESET_COLOR}")
                         # 显示关键字段，帮助用户理解数据
                         key_fields = [k for k in ai_content_data.keys() if k not in ["raw_data", "detail_data"]][:5]
                         for k in key_fields:
@@ -989,30 +1301,35 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                             # 显示计算得出的总体评分
                             ai_score_float = avg_score
                             score_color = SUCCESS_COLOR if ai_score_float >= 0.7 else (WARNING_COLOR if ai_score_float >= 0.5 else ERROR_COLOR)
-                            print(f"{score_color}  • 人类写作特征评分: {ai_score_float:.2f} {get_progress_bar(ai_score_float)}{RESET_COLOR}")
-                            print(f"{DETAIL_COLOR}  • {get_ai_content_description(ai_score_float)}{RESET_COLOR}")
+                            print(f"{score_color}  • {t('人类写作特征评分')}: {ai_score_float:.2f} {get_progress_bar(ai_score_float)}{RESET_COLOR}")
+                            print(f"{DETAIL_COLOR}  • {get_ai_content_description(ai_score_float, language)}{RESET_COLOR}")
                             
                             # 添加AI生成概率
                             ai_probability = max(0, min(1, 1 - ai_score_float))
                             ai_prob_color = SUCCESS_COLOR if ai_probability <= 0.3 else (WARNING_COLOR if ai_probability <= 0.5 else ERROR_COLOR)
-                            print(f"{ai_prob_color}  • AI生成概率: {ai_probability:.1%}{RESET_COLOR}")
+                            
+                            # 在英文模式下使用百分比格式，中文模式下保留原格式
+                            if language == 'zh':
+                                print(f"{ai_prob_color}  • {t('AI生成概率')}: {ai_probability:.1%}{RESET_COLOR}")
+                            else:
+                                print(f"{ai_prob_color}  • {t('AI生成概率')}: {ai_probability*100:.1f}%{RESET_COLOR}")
                     
                     # 显示详细特征分析
                     if detailed_scores and isinstance(detailed_scores, dict):
-                        print(f"\n{SECTION_COLOR}  AI特征详细分析:{RESET_COLOR}")
+                        print(f"\n{SECTION_COLOR}  {t('AI特征详细分析')}:{RESET_COLOR}")
                         
                         # 定义常见评分项的描述
                         score_descriptions = {
-                            "expression_pattern": "表达模式 (句式结构的人类特征)",
-                            "vocabulary_diversity": "词汇多样性 (用词丰富度的人类特征)",
-                            "sentence_variation": "句子变化 (句式变化多样性的人类特征)",
-                            "context_coherence": "上下文连贯性 (逻辑流畅度的人类特征)",
-                            "human_traits": "人类特征 (文本中的人类思维特征)",
-                            "表达模式": "表达模式 (句式结构的人类特征)",
-                            "词汇多样性": "词汇多样性 (用词丰富度的人类特征)",
-                            "句子变化": "句子变化 (句式变化多样性的人类特征)",
-                            "上下文连贯性": "上下文连贯性 (逻辑流畅度的人类特征)",
-                            "人类特征": "人类特征 (文本中的人类思维特征)"
+                            "expression_pattern": t("表达模式 (句式结构的人类特征)"),
+                            "vocabulary_diversity": t("词汇多样性 (用词丰富度的人类特征)"),
+                            "sentence_variation": t("句子变化 (句式变化多样性的人类特征)"),
+                            "context_coherence": t("上下文连贯性 (逻辑流畅度的人类特征)"),
+                            "human_traits": t("人类特征 (文本中的人类思维特征)"),
+                            "表达模式": t("表达模式 (句式结构的人类特征)"),
+                            "词汇多样性": t("词汇多样性 (用词丰富度的人类特征)"),
+                            "句子变化": t("句子变化 (句式变化多样性的人类特征)"),
+                            "上下文连贯性": t("上下文连贯性 (逻辑流畅度的人类特征)"),
+                            "人类特征": t("人类特征 (文本中的人类思维特征)")
                         }
                         
                         # 计算有效评分项
@@ -1109,12 +1426,12 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
             try:
                 # 处理主要维度评分
                 dimensions = {
-                    "内容真实性": "新闻内容与事实的符合程度",
-                    "信息准确性": "信息的精确性和完整性",
-                    "来源可靠性": "信息来源的权威性和可信度",
-                    "引用质量": "引用的准确性和相关性",
-                    "语言客观性": "语言表达的中立性和客观性",
-                    "逻辑连贯性": "内容的逻辑性和连贯性"
+                    "内容真实性": t("新闻内容与事实的符合程度"),
+                    "信息准确性": t("信息的精确性和完整性"),
+                    "来源可靠性": t("信息来源的权威性和可信度"),
+                    "引用质量": t("引用的准确性和相关性"),
+                    "语言客观性": t("语言表达的中立性和客观性"),
+                    "逻辑连贯性": t("内容的逻辑性和连贯性")
                 }
                 
                 for dim, desc in dimensions.items():
@@ -1123,12 +1440,12 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                         try:
                             score_float = validate_score(score, f"主要评分.{dim}")
                             color = SUCCESS_COLOR if score_float >= 0.8 else (WARNING_COLOR if score_float >= 0.6 else ERROR_COLOR)
-                            print(f"{color}  • {dim}: {score_float:.2f} {get_progress_bar(score_float)}{RESET_COLOR}")
+                            print(f"{color}  • {t(dim)}: {score_float:.2f} {get_progress_bar(score_float)}{RESET_COLOR}")
                             print(f"{DETAIL_COLOR}    - {desc}{RESET_COLOR}")
                             logger.debug(f"{dim}评分: {score_float:.2f}")
                         except ValueError:
                             logger.warning(f"{dim}评分无效: {score}")
-                            print(f"{ERROR_COLOR}  • {dim}: 数据无效{RESET_COLOR}")
+                            print(f"{ERROR_COLOR}  • {t(dim)}: {t('数据无效')}{RESET_COLOR}")
             except Exception as e:
                 logger.error(f"处理主要评分指标时出错: {str(e)}")
                 print(f"{ERROR_COLOR}  • 评分数据处理错误{RESET_COLOR}")
@@ -1162,20 +1479,20 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
             # 显示细分评分
             for category, scores in categories.items():
                 if scores:
-                    print(f"{SUBHEADER_COLOR}  ▶ {category}相关指标:{RESET_COLOR}")
+                    print(f"{SUBHEADER_COLOR}  ▶ {t(category+'相关指标')}:{RESET_COLOR}")
                     for name, score in scores:
                         color = SUCCESS_COLOR if score >= 0.8 else (WARNING_COLOR if score >= 0.6 else ERROR_COLOR)
-                        print(f"{color}    • {name}: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
+                        print(f"{color}    • {t(name)}: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
         
         # 二、来源可靠性与引用分析
-        print(f"\n{SUBHEADER_COLOR}二、来源可靠性与引用分析{RESET_COLOR}")
+        print(f"\n{SUBHEADER_COLOR}{('二、' if language == 'zh' else '2. ')}{t('来源可靠性与引用分析')}{RESET_COLOR}")
         print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
         
         # 5. 处理引用分析
         logger.debug("开始处理引用分析")
         citation_data = result.get("citation_analysis", {})
         if citation_data and isinstance(citation_data, dict):
-            print(f"{SECTION_COLOR}1. 引用统计:{RESET_COLOR}")
+            print(f"{SECTION_COLOR}1. {t('引用统计')}:{RESET_COLOR}")
             try:
                 # 基本引用统计
                 total_citations = int(citation_data.get("total_citations", 0))
@@ -1245,15 +1562,15 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                 print(f"{diversity_color}  • 来源多样性: {diversity_score:.2f} {get_progress_bar(diversity_score)}{RESET_COLOR}")
                 
                 # 引用特征分析
-                print(f"\n{SECTION_COLOR}引用特征分析:{RESET_COLOR}")
+                print(f"\n{SECTION_COLOR}{t('引用特征分析')}:{RESET_COLOR}")
                 
                 # 根据评分生成更详细的子项评分
                 features = [
-                    ("引用准确性", min(1.0, citation_quality * 1.05), "引用内容与原始资料的一致程度"),
-                    ("引用相关性", min(1.0, citation_quality * 0.95), "引用与文章主题的相关程度"),
-                    ("来源权威性", min(1.0, source_reliability * 1.02), "引用来源的专业性与公信力"),
-                    ("来源多样性", diversity_score, "引用来源的多元化程度"),
-                    ("时效性", min(1.0, (citation_quality + source_reliability) / 2 * 0.9), "引用内容的时效性与更新程度")
+                    (t("引用准确性"), min(1.0, citation_quality * 1.05), t("引用内容与原始资料的一致程度")),
+                    (t("引用相关性"), min(1.0, citation_quality * 0.95), t("引用与文章主题的相关程度")),
+                    (t("来源权威性"), min(1.0, source_reliability * 1.02), t("引用来源的专业性与公信力")),
+                    (t("来源多样性"), diversity_score, t("引用来源的多元化程度")),
+                    (t("时效性"), min(1.0, (citation_quality + source_reliability) / 2 * 0.9), t("引用内容的时效性与更新程度"))
                 ]
                 
                 for name, score, desc in features:
@@ -1263,18 +1580,18 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                 
                 # 生成来源类型分析
                 if source_reliability > 0.8:
-                    source_types = ["学术期刊", "官方网站", "权威媒体", "专业报告"]
+                    source_types = [t("学术期刊"), t("官方网站"), t("权威媒体"), t("专业报告")]
                 elif source_reliability > 0.6:
-                    source_types = ["新闻媒体", "行业网站", "专业博客", "政府公告"]
+                    source_types = [t("新闻媒体"), t("行业网站"), t("专业博客"), t("政府公告")]
                 else:
-                    source_types = ["网络媒体", "个人博客", "社交媒体", "新闻聚合"]
+                    source_types = [t("网络媒体"), t("个人博客"), t("社交媒体"), t("新闻聚合")]
                 
                 # 随机选择2-4个来源类型
                 import random
                 selected_types = random.sample(source_types, min(len(source_types), random.randint(2, 4)))
                 
                 # 展示来源类型
-                print(f"\n{SECTION_COLOR}来源类型分析:{RESET_COLOR}")
+                print(f"\n{SECTION_COLOR}{t('来源类型分析')}:{RESET_COLOR}")
                 for source_type in selected_types:
                     print(f"{DETAIL_COLOR}  • {source_type}{RESET_COLOR}")
                 
@@ -1304,23 +1621,23 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                 source_color = SUCCESS_COLOR if source_reliability >= 0.8 else (WARNING_COLOR if source_reliability >= 0.6 else ERROR_COLOR)
                 citation_color = SUCCESS_COLOR if citation_quality >= 0.8 else (WARNING_COLOR if citation_quality >= 0.6 else ERROR_COLOR)
                 
-                print(f"{source_color}  • 来源可靠性: {source_reliability:.2f} {get_progress_bar(source_reliability)}{RESET_COLOR}")
-                print(f"{citation_color}  • 引用质量: {citation_quality:.2f} {get_progress_bar(citation_quality)}{RESET_COLOR}")
+                print(f"{source_color}  • {t('来源可靠性')}: {source_reliability:.2f} {get_progress_bar(source_reliability)}{RESET_COLOR}")
+                print(f"{citation_color}  • {t('引用质量')}: {citation_quality:.2f} {get_progress_bar(citation_quality)}{RESET_COLOR}")
                 
                 # 解释评分含义
                 if source_reliability >= 0.8:
-                    print(f"{DETAIL_COLOR}    - 来源高度可靠，包含权威或官方信息{RESET_COLOR}")
+                    print(f"{DETAIL_COLOR}    - {t('来源高度可靠，包含权威或官方信息')}{RESET_COLOR}")
                 elif source_reliability >= 0.6:
-                    print(f"{DETAIL_COLOR}    - 来源基本可靠，但可能包含部分未经验证信息{RESET_COLOR}")
+                    print(f"{DETAIL_COLOR}    - {t('来源基本可靠，但可能包含部分未经验证信息')}{RESET_COLOR}")
                 else:
-                    print(f"{DETAIL_COLOR}    - 来源可靠性存疑，建议核实关键信息{RESET_COLOR}")
+                    print(f"{DETAIL_COLOR}    - {t('来源可靠性存疑，建议核实关键信息')}{RESET_COLOR}")
                 
                 if citation_quality >= 0.8:
-                    print(f"{DETAIL_COLOR}    - 引用质量高，引用准确且来源可靠{RESET_COLOR}")
+                    print(f"{DETAIL_COLOR}    - {t('引用质量高，引用准确且来源可靠')}{RESET_COLOR}")
                 elif citation_quality >= 0.6:
-                    print(f"{DETAIL_COLOR}    - 引用质量一般，部分引用需要核实{RESET_COLOR}")
+                    print(f"{DETAIL_COLOR}    - {t('引用质量一般，部分引用需要核实')}{RESET_COLOR}")
                 else:
-                    print(f"{DETAIL_COLOR}    - 引用质量差，多数引用无法验证{RESET_COLOR}")
+                    print(f"{DETAIL_COLOR}    - {t('引用质量差，多数引用无法验证')}{RESET_COLOR}")
             except (ValueError, TypeError):
                 print(f"{ERROR_COLOR}  • 评分数据格式错误{RESET_COLOR}")
         
@@ -1390,7 +1707,7 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
             print(f"{DETAIL_COLOR}  • 建议：进行更详细的来源分析以提高评估准确性{RESET_COLOR}")
         
         # 三、语言分析
-        print(f"\n{SUBHEADER_COLOR}三、语言分析{RESET_COLOR}")
+        print(f"\n{SUBHEADER_COLOR}{('三、' if language == 'zh' else '3. ')}{t('语言与逻辑分析')}{RESET_COLOR}")
         print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
         
         # 7. 处理语言中立性
@@ -1471,7 +1788,7 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                 logger.error(f"处理语言评分时出错: {str(e)}")
         
         # 添加交叉验证部分
-        print(f"\n{SUBHEADER_COLOR}四、交叉验证结果{RESET_COLOR}")
+        print(f"\n{SUBHEADER_COLOR}{('四、' if language == 'zh' else '4. ')}{t('交叉验证结果')}{RESET_COLOR}")
         print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
         
         # 优化交叉验证数据的显示
@@ -1480,7 +1797,7 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
         # 检查是否有标准格式的交叉验证数据
         if cross_validation_data and isinstance(cross_validation_data, dict):
             has_cv_data = True
-            print(f"{SECTION_COLOR}交叉验证评估:{RESET_COLOR}")
+            print(f"{SECTION_COLOR}{t('交叉验证评估')}:{RESET_COLOR}")
             try:
                 # 提取验证点
                 verification_points = []
@@ -1501,110 +1818,113 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                 
                 # 显示验证点
                 if verification_points:
-                    print(f"\n{SECTION_COLOR}验证点分析:{RESET_COLOR}")
+                    print(f"\n{SECTION_COLOR}{t('验证点分析')}:{RESET_COLOR}")
                     for i, point in enumerate(verification_points, 1):
                         if isinstance(point, dict):
-                            # 检查是否包含key_points键，如果包含则说明是多个验证点的集合
+                            # --> NEW: Check for the 'key_points' structure <--
                             if "key_points" in point and isinstance(point["key_points"], list):
+                                print(f"{DETAIL_COLOR}  • {t('验证点')} {i}:{RESET_COLOR}")
                                 for j, sub_point in enumerate(point["key_points"], 1):
-                                    # 获取内容
                                     if isinstance(sub_point, dict) and "内容" in sub_point:
                                         content = sub_point["内容"]
                                         importance = sub_point.get("重要性", "中")
-                                        score_color = SUCCESS_COLOR if "验证评分" in point and point["验证评分"] >= 0.7 else (WARNING_COLOR if "验证评分" in point and point["验证评分"] >= 0.5 else ERROR_COLOR)
-                                        print(f"{score_color}  • 验证点 {i}.{j}: {content}{RESET_COLOR}")
-                                        if "验证评分" in point:
-                                            print(f"{score_color}    得分: {point['验证评分']:.2f} {get_progress_bar(point['验证评分'])}{RESET_COLOR}")
-                                        
-                                        # 显示重要性
-                                        print(f"{DETAIL_COLOR}    重要性: {importance}{RESET_COLOR}")
-                                        
-                                        # 如果有验证结论，显示它
-                                        if "验证结论" in point and point["验证结论"]:
-                                            print(f"{DETAIL_COLOR}    结论: {point['验证结论']}{RESET_COLOR}")
-                                continue
-                            
-                            # 获取内容，尝试多个可能的键名
-                            content = None
-                            for content_key in ["内容", "验证内容", "content", "claim", "statement"]:
-                                if content_key in point and point[content_key]:
-                                    content = point[content_key]
-                                    break
-                            
-                            if not content:
-                                content = "未知内容"
-                                
-                            # 获取分数，尝试多个可能的键名
-                            score = None
-                            for score_key in ["验证评分", "评分", "score", "confidence"]:
-                                if score_key in point and point[score_key] is not None:
-                                    try:
-                                        score = float(point[score_key])
+                                        importance_translated = t(importance)
+                                        # Try to get the overall score for the main point
+                                        main_point_score = None
+                                        for score_key in ["验证评分", "score", "评分"]:
+                                            if score_key in point and point[score_key] is not None:
+                                                try:
+                                                    main_point_score = float(point[score_key])
+                                                    break
+                                                except (ValueError, TypeError):
+                                                    pass
+                                        score_color = SUCCESS_COLOR if main_point_score is not None and main_point_score >= 0.7 else (WARNING_COLOR if main_point_score is not None and main_point_score >= 0.5 else ERROR_COLOR)
+
+                                        print(f"{score_color}    {j}. {content}{RESET_COLOR}")
+                                        print(f"{DETAIL_COLOR}       {t('重要性')}: {importance_translated}{RESET_COLOR}")
+
+                                # After processing sub-points, print the overall score for the main point
+                                if main_point_score is not None:
+                                     print(f"{score_color}    {t('总体得分')}: {main_point_score:.2f}{RESET_COLOR}")
+
+                            # --> EXISTING LOGIC for points without 'key_points' <--
+                            else:
+                                # 获取内容，尝试多个可能的键名
+                                content = None
+                                for content_key in ["内容", "验证内容", "content", "claim", "statement"]:
+                                    if content_key in point and point[content_key]:
+                                        content = point[content_key]
                                         break
-                                    except (ValueError, TypeError):
-                                        pass
-                            
-                            if score is None:
-                                score = 0.5
-                                
-                            score_color = SUCCESS_COLOR if score >= 0.7 else (WARNING_COLOR if score >= 0.5 else ERROR_COLOR)
-                            print(f"{score_color}  • 验证点 {i}: {content}{RESET_COLOR}")
-                            print(f"{score_color}    得分: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
-                            
-                            # 如果有验证结论，显示它
-                            if "验证结论" in point and point["验证结论"]:
-                                print(f"{DETAIL_COLOR}    结论: {point['验证结论']}{RESET_COLOR}")
-                            
-                            # 如果有搜索结果数量，显示它
-                            if "搜索结果数量" in point:
-                                result_count = point["搜索结果数量"]
-                                if result_count == 0:
-                                    print(f"{WARNING_COLOR}    搜索结果: 未找到相关内容{RESET_COLOR}")
-                                else:
-                                    print(f"{DETAIL_COLOR}    搜索结果: {result_count}个相关内容{RESET_COLOR}")
-                                    
-                            # 显示搜索结果链接和摘要
-                            if "搜索结果摘要" in point and point["搜索结果摘要"]:
-                                print(f"{DETAIL_COLOR}    相关信息摘要:{RESET_COLOR}")
-                                for j, summary in enumerate(point["搜索结果摘要"], 1):
-                                    if summary:
-                                        # 摘要限制在100字符以内，显示为间断摘要
-                                        if len(summary) > 100:
-                                            formatted_summary = summary[:40] + "..." + summary[len(summary)-40:]
-                                        else:
-                                            formatted_summary = summary
-                                        print(f"{DETAIL_COLOR}      {j}. {formatted_summary}{RESET_COLOR}")
-                            
-                            # 获取搜索结果链接
-                            search_results = None
-                            for results_key in ["search_results", "搜索结果", "results", "相关信息"]:
-                                if results_key in point and point[results_key]:
-                                    search_results = point[results_key]
-                                    break
-                            
-                            # 如果找到了搜索结果链接，显示它们
-                            if search_results and isinstance(search_results, list):
-                                print(f"{DETAIL_COLOR}    相关链接:{RESET_COLOR}")
-                                for j, result_item in enumerate(search_results[:3], 1):  # 限制显示3个链接
-                                    if isinstance(result_item, dict):
-                                        url = result_item.get("url", "")
-                                        title = result_item.get("title", "未知标题")
-                                        print(f"{DETAIL_COLOR}      {j}. {title}{RESET_COLOR}")
-                                        print(f"{INFO_COLOR}         {url}{RESET_COLOR}")
-                                        
-                                        # 如果有内容摘要，显示间断摘要
-                                        content = result_item.get("content", "")
-                                        if content:
-                                            if len(content) > 100:
-                                                formatted_content = content[:40] + "..." + content[len(content)-40:]
+                                if not content: content = t("未知内容")
+
+                                # 获取分数，尝试多个可能的键名
+                                score = None
+                                for score_key in ["验证评分", "评分", "score", "confidence"]:
+                                    if score_key in point and point[score_key] is not None:
+                                        try:
+                                            score = float(point[score_key])
+                                            break
+                                        except (ValueError, TypeError): pass
+                                if score is None: score = 0.5
+
+                                score_color = SUCCESS_COLOR if score >= 0.7 else (WARNING_COLOR if score >= 0.5 else ERROR_COLOR)
+                                print(f"{score_color}  • {t('验证点')} {i}: {content}{RESET_COLOR}")
+                                print(f"{score_color}    {t('得分')}: {score:.2f} {get_progress_bar(score)}{RESET_COLOR}")
+
+                                # 如果有验证结论，显示它
+                                if "验证结论" in point and point["验证结论"]:
+                                    print(f"{DETAIL_COLOR}    {t('结论')}: {point['验证结论']}{RESET_COLOR}")
+
+                                # 如果有搜索结果数量，显示它
+                                if "搜索结果数量" in point:
+                                    result_count = point["搜索结果数量"]
+                                    if result_count == 0:
+                                        print(f"{WARNING_COLOR}    {t('搜索结果')}: {t('未找到相关内容')}{RESET_COLOR}")
+                                    else:
+                                        print(f"{DETAIL_COLOR}    {t('搜索结果')}: {result_count}{t('个')}{t('相关内容')}{RESET_COLOR}")
+
+                                # 显示搜索结果链接和摘要
+                                if "搜索结果摘要" in point and point["搜索结果摘要"]:
+                                    print(f"{DETAIL_COLOR}    {t('相关信息摘要')}:{RESET_COLOR}")
+                                    for j, summary in enumerate(point["搜索结果摘要"], 1):
+                                        if summary:
+                                            if len(summary) > 100:
+                                                formatted_summary = summary[:40] + "..." + summary[len(summary)-40:]
                                             else:
-                                                formatted_content = content
-                                            print(f"{NEUTRAL_COLOR}         摘要: {formatted_content}{RESET_COLOR}")
-                                    elif isinstance(result_item, str) and ("http://" in result_item or "https://" in result_item):
-                                        print(f"{INFO_COLOR}      {j}. {result_item}{RESET_COLOR}")
-                                
-                                if len(search_results) > 3:
-                                    print(f"{DETAIL_COLOR}      ... 等共 {len(search_results)} 个相关链接{RESET_COLOR}")
+                                                formatted_summary = summary
+                                            print(f"{DETAIL_COLOR}      {j}. {formatted_summary}{RESET_COLOR}")
+
+                                # 获取搜索结果链接
+                                search_results = None
+                                for results_key in ["search_results", "搜索结果", "results", "相关信息"]:
+                                    if results_key in point and point[results_key]:
+                                        search_results = point[results_key]
+                                        break
+
+                                # 如果找到了搜索结果链接，显示它们
+                                if search_results and isinstance(search_results, list):
+                                    print(f"{DETAIL_COLOR}    {t('相关链接')}:{RESET_COLOR}")
+                                    for j, result_item in enumerate(search_results[:3], 1):  # 限制显示3个链接
+                                        if isinstance(result_item, dict):
+                                            url = result_item.get("url", "")
+                                            title = result_item.get("title", t("未知标题"))
+                                            print(f"{DETAIL_COLOR}      {j}. {title}{RESET_COLOR}")
+                                            print(f"{INFO_COLOR}         {url}{RESET_COLOR}")
+
+                                            content = result_item.get("content", "")
+                                            if content:
+                                                if len(content) > 100:
+                                                    formatted_content = content[:40] + "..." + content[len(content)-40:]
+                                                else:
+                                                    formatted_content = content
+                                                print(f"{NEUTRAL_COLOR}         {t('摘要')}: {formatted_content}{RESET_COLOR}")
+                                        elif isinstance(result_item, str) and ("http://" in result_item or "https://" in result_item):
+                                            print(f"{INFO_COLOR}      {j}. {result_item}{RESET_COLOR}")
+
+                                    if len(search_results) > 3:
+                                        print(f"{DETAIL_COLOR}      ... {t('等共')} {len(search_results)} {t('个')}{t('相关链接')}{RESET_COLOR}")
+                        else:
+                            print(f"{WARNING_COLOR}  • {t('验证点')} {i}: {t('格式无效')}{RESET_COLOR}")
                 else:
                     # 如果没有验证点但已通过测试验证了SearXNG可用，显示提示信息
                     print(f"\n{WARNING_COLOR}  • 未能成功提取验证点，但搜索服务正常{RESET_COLOR}")
@@ -1739,18 +2059,18 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                 cross_validation_data = {"source_count": 0, "unique_sources": 0}
         
         # 分析问题
-        problems = analyze_problems(result, total_score, main_scores, cross_validation_data)
+        problems = analyze_problems(result, total_score, main_scores, cross_validation_data, language)
         
         # 打印问题分析部分
-        print(f"\n{SUBHEADER_COLOR}五、问题点分析{RESET_COLOR}")
+        print(f"\n{SUBHEADER_COLOR}{('五、' if language == 'zh' else '5. ')}{t('问题点分析')}{RESET_COLOR}")
         print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
         
         if not problems:
-            print(f"{SUCCESS_COLOR}  ✓ 未发现明显问题{RESET_COLOR}")
-            print(f"{DETAIL_COLOR}  • 建议：保持批判性思维，关注信息更新{RESET_COLOR}")
+            print(f"{SUCCESS_COLOR}  ✓ {t('未发现明显问题')}{RESET_COLOR}")
+            print(f"{DETAIL_COLOR}  • {t('建议：保持批判性思维，关注信息更新')}{RESET_COLOR}")
         else:
             # 按严重程度排序（严重 > 中等）
-            problems.sort(key=lambda x: 0 if x["severity"] == "严重" else 1)
+            problems.sort(key=lambda x: 0 if x["severity"] == ("严重" if language == 'zh' else "Severe") else 1)
             
             for i, problem in enumerate(problems, 1):
                 color = problem["color"]
@@ -1762,12 +2082,15 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
         # 系统警告
         warnings = result.get("警告", [])
         if warnings and isinstance(warnings, list):
-            print(f"\n{SUBHEADER_COLOR}六、系统警告{RESET_COLOR}")
+            print(f"\n{SUBHEADER_COLOR}{('六、' if language == 'zh' else '6. ')}{t('系统警告')}{RESET_COLOR}")
             print(f"{DETAIL_COLOR}{'━' * 70}{RESET_COLOR}")
             for warning in warnings:
                 if isinstance(warning, str):
                     logger.warning(f"系统警告: {warning}")
-                    print(f"{WARNING_COLOR}  ⚠️ {warning}{RESET_COLOR}")
+                    warning_text = warning
+                    if language == 'en' and warning in TRANSLATIONS:
+                        warning_text = TRANSLATIONS[warning].get('en', warning)
+                    print(f"{WARNING_COLOR}  ⚠️ {warning_text}{RESET_COLOR}")
             
             # 添加交叉验证验证点统计信息
             if "交叉验证" in result and isinstance(result["交叉验证"], dict):
@@ -1779,7 +2102,10 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                     no_result_count = stats.get("无结果", 0)
                     
                     if total_points > 0:
-                        print(f"{INFO_COLOR}  ℹ️ 交叉验证: 共有{total_points}个验证点，其中{success_count}个通过验证，{fail_count}个验证失败，{no_result_count}个未找到相关信息{RESET_COLOR}")
+                        if language == 'zh':
+                            print(f"{INFO_COLOR}  ℹ️ 交叉验证: 共有{total_points}个验证点，其中{success_count}个通过验证，{fail_count}个验证失败，{no_result_count}个未找到相关信息{RESET_COLOR}")
+                        else:
+                            print(f"{INFO_COLOR}  ℹ️ Cross-Validation: {total_points} verification points in total, {success_count} passed, {fail_count} failed, {no_result_count} without related information{RESET_COLOR}")
                 elif "验证点" in result["交叉验证"]:
                     # 如果没有统计数据但有验证点，我们自己计算
                     verification_points = result["交叉验证"]["验证点"]
@@ -1789,11 +2115,14 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
                     no_result_count = sum(1 for p in verification_points if isinstance(p, dict) and (p.get("搜索结果数量", 0) == 0 or (0.4 <= p.get("验证评分", 0) < 0.7)))
                     
                     if total_points > 0:
-                        print(f"{INFO_COLOR}  ℹ️ 交叉验证: 共有{total_points}个验证点，其中{success_count}个通过验证，{fail_count}个验证失败，{no_result_count}个未找到相关信息{RESET_COLOR}")
+                        if language == 'zh':
+                            print(f"{INFO_COLOR}  ℹ️ 交叉验证: 共有{total_points}个验证点，其中{success_count}个通过验证，{fail_count}个验证失败，{no_result_count}个未找到相关信息{RESET_COLOR}")
+                        else:
+                            print(f"{INFO_COLOR}  ℹ️ Cross-Validation: {total_points} verification points in total, {success_count} passed, {fail_count} failed, {no_result_count} without related information{RESET_COLOR}")
         
         # 底部信息
         print(f"\n{HEADER_COLOR}{'=' * 70}{RESET_COLOR}")
-        print(f"{HEADER_COLOR}{'分析完成 - 感谢使用新闻可信度分析工具':^70}{RESET_COLOR}")
+        print(f"{HEADER_COLOR}{t('分析完成 - 感谢使用新闻可信度分析工具'):^70}{RESET_COLOR}")
         print(f"{HEADER_COLOR}{'=' * 70}{RESET_COLOR}")
         
         logger.info("分析报告生成完成")
@@ -1806,7 +2135,7 @@ def print_formatted_result(result: Dict[str, Any], colored_output: bool = True) 
         # 尝试打印原始数据以便调试
         print(f"{ERROR_COLOR}原始数据:\n{result}{RESET_COLOR}")
 
-def display_detailed_results(result: Dict[str, Any]) -> None:
+def display_detailed_results(result: Dict[str, Any], language: str = 'zh') -> None:
     """显示详细的分析结果"""
     
     # AI生成内容检测
@@ -1904,76 +2233,80 @@ def display_detailed_results(result: Dict[str, Any]) -> None:
         local = result["local_verification"]
         print(f"• {local.get('assessment', '未发现明显的本地相关性指标')}")
     else:
-        print(f"{ERROR_COLOR}  • 错误：无法获取本地新闻验证数据{RESET_COLOR}")
+        print(f"{ERROR_COLOR}  • {t('错误：无法获取本地新闻验证数据')}{RESET_COLOR}")
 
     # 逻辑分析
-    print(f"\n{SECTION_COLOR}▶ 逻辑分析{RESET_COLOR}")
+    print(f"\n{SECTION_COLOR}{t('▶ 逻辑分析')}{RESET_COLOR}")
     if "logic_analysis" in result:
         logic = result["logic_analysis"]
         for point in logic.get("points", []):
             print(f"• {point}")
     else:
-        print(f"{ERROR_COLOR}  • 错误：无法获取逻辑分析数据{RESET_COLOR}")
+        print(f"{ERROR_COLOR}  • {t('错误：无法获取逻辑分析数据')}{RESET_COLOR}")
 
     # 交叉验证
-    print(f"\n{SECTION_COLOR}▶ 交叉验证{RESET_COLOR}")
+    print(f"\n{SECTION_COLOR}{t('▶ 交叉验证')}{RESET_COLOR}")
     if "cross_validation" in result:
         cross = result["cross_validation"]
         if "source_count" in cross:
-            print(f"• 搜索到了{cross['unique_sources']}个不同来源的{cross['source_count']}篇报道")
+            # 直接使用条件判断处理不同语言版本
+            if language == 'zh':
+                print(f"• 搜索到了{cross['unique_sources']}个不同来源的{cross['source_count']}篇报道")
+            else:
+                print(f"• Found {cross['source_count']} reports from {cross['unique_sources']} different sources")
         if "timeliness" in cross:
             print(f"• {cross['timeliness']}")
         if "source_credibility" in cross:
             print(f"• {cross['source_credibility']}")
     else:
-        print(f"{ERROR_COLOR}  • 错误：无法获取交叉验证数据{RESET_COLOR}")
+        print(f"{ERROR_COLOR}  • {t('错误：无法获取交叉验证数据')}{RESET_COLOR}")
 
 def get_source_level(count: int) -> str:
     if count == 0:
-        return "无"
+        return t("无")
     elif count < 3:
-        return "有限"
+        return t("有限")
     elif count < 5:
-        return "适量"
+        return t("适量")
     else:
-        return "充足"
+        return t("充足")
 
 def get_citation_status(count: int) -> str:
     if count == 0:
-        return "无明确引用"
+        return t("无明确引用")
     elif count < 3:
-        return f"较少 ({count}个)"
+        return f"{t('较少')} ({count}{t('个')})"
     elif count < 5:
-        return f"适量 ({count}个)"
+        return f"{t('适量')} ({count}{t('个')})"
     else:
-        return f"充足 ({count}个)"
+        return f"{t('充足')} ({count}{t('个')})"
 
 def get_quantity_level(count: int) -> str:
     if count == 0:
-        return "无"
+        return t("无")
     elif count < 3:
-        return "较少"
+        return t("较少")
     elif count < 5:
-        return "适量"
+        return t("适量")
     else:
-        return "充足"
+        return t("充足")
 
 def get_diversity_assessment(count: int) -> str:
     if count == 0:
-        return "无法评估"
+        return t("无法评估")
     elif count < 2:
-        return "单一"
+        return t("单一")
     elif count < 4:
-        return "一般"
+        return t("一般")
     else:
-        return "多样"
+        return t("多样")
 
 def get_authority_level(count: int) -> str:
     if count == 0:
-        return "低"
+        return t("低")
     elif count < 2:
-        return "一般"
+        return t("一般")
     elif count < 4:
-        return "较高"
+        return t("较高")
     else:
-        return "高" 
+        return t("高") 

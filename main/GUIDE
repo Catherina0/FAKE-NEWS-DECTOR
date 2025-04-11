@@ -112,6 +112,14 @@
 - `get_credibility_summary()` - 生成简短的总结性描述
 - `get_rating_emoji()` - 将评分转换为emoji表示和评级
 - `get_progress_bar()` - 生成可视化进度条
+- `get_translation(text, language='zh')` - 获取翻译
+  - 调用示例: `translated = get_translation("原始文本", language="en")`
+  
+- `t(text)` - get_translation的简化别名
+  - 调用示例: `translated = t("原始文本")`
+  
+- `format_score(score)` - 格式化评分
+  - 调用示例: `formatted = format_score(0.87)`
 
 **格式化逻辑**：
 result_formatter.py负责将分析结果以结构化、易读的方式呈现给用户，输出采用分级结构，包括总体评分、各维度评分和详细分析。根据评分不同，使用不同颜色和表情符号增强可读性。
@@ -364,3 +372,265 @@ AI生成内容检测流程:
 4. **多语言支持**：
    - 扩展到更多语言的分析
    - 语言特定的分析规则和评分标准
+
+## 函数调用参考
+
+### core_analyzer.py 核心函数
+
+- `analyze_news_credibility(text, url=None, weights=None, use_ai_services=True, use_online=True)` - 综合分析新闻可信度
+  - 调用示例: `result = analyze_news_credibility("新闻文本内容", url="https://example.com/news", use_ai_services=True)`
+  
+- `save_news_to_local(text, url, result, save_dir="saved_news", image_paths=None)` - 保存新闻和分析结果到本地
+  - 调用示例: `success = save_news_to_local("新闻文本", "https://example.com/news", result_dict, save_dir="my_news")`
+
+### text_analysis.py 文本分析函数
+
+- `check_ai_content(text)` - 检测内容是否由AI生成
+  - 调用示例: `ai_score, ai_details = check_ai_content("需要分析的文本内容")`
+  
+- `analyze_language_neutrality(text)` - 分析语言中立性
+  - 调用示例: `neutrality_score, details = analyze_language_neutrality("新闻文本内容")`
+  
+- `analyze_source_quality(text, url=None)` - 分析来源质量
+  - 调用示例: `quality_score, quality_details = analyze_source_quality("引用了多个来源的新闻", url="https://example.com")`
+  
+- `analyze_text_logic(text)` - 分析文本逻辑性
+  - 调用示例: `logic_score, logic_details = analyze_text_logic("需要分析逻辑性的文本")`
+  
+- `basic_logic_analysis(text)` - 基本逻辑分析
+  - 调用示例: `basic_score, basic_details = basic_logic_analysis("新闻文本内容")`
+  
+- `local_news_validation(text)` - 本地新闻验证
+  - 调用示例: `validation_score, validation_details = local_news_validation("新闻文本")`
+
+### citation_analysis.py 引用分析函数
+
+- `extract_citations(text)` - 从文本中提取引用内容
+  - 调用示例: `citations_list = extract_citations("包含引用的新闻文本")`
+  
+- `extract_citation_source(context)` - 从上下文中提取引用来源
+  - 调用示例: `source = extract_citation_source("据CNN报道，最新研究表明...")`
+  
+- `extract_source_from_indicator(indicator_text)` - 从指示词中提取来源
+  - 调用示例: `source = extract_source_from_indicator("据新华社报道")`
+  
+- `analyze_citation_quality(citations)` - 分析引用质量
+  - 调用示例: `quality_analysis = analyze_citation_quality([{"content": "引用内容", "source": "来源"}])`
+  
+- `judge_citation_truthfulness(citation)` - 判断引用真实性
+  - 调用示例: `truthfulness = judge_citation_truthfulness({"content": "引用内容", "source": "来源"})`
+  
+- `get_citation_score(text)` - 获取引用质量评分
+  - 调用示例: `citation_score, citation_details = get_citation_score("包含引用的新闻文本")`
+  
+- `analyze_citation_validity(text)` - 分析引用有效性
+  - 调用示例: `validity_score, validity_details = analyze_citation_validity("包含引用的新闻文本")`
+
+### citation_validation.py 引用验证函数
+
+- `validate_citations(text)` - 验证文本中引用的真实性
+  - 调用示例: `trust_score, validation_details = validate_citations("包含引用的新闻文本")`
+  
+- `generate_validation_summary(verification_results, score)` - 生成验证摘要
+  - 调用示例: `summary = generate_validation_summary([{"验证状态": "已验证", "验证评分": 0.8}], 0.75)`
+
+### validation.py 交叉验证函数
+
+- `perform_cross_validation(text, ai_analysis)` - 执行交叉验证
+  - 调用示例: `cross_validation_data = perform_cross_validation("新闻文本", ai_analysis_dict)`
+  
+- `extract_verification_points_with_deepseek(text)` - 使用DeepSeek提取验证点
+  - 调用示例: `verification_points = extract_verification_points_with_deepseek("含有事实陈述的新闻文本")`
+  
+- `generate_default_verification_points(text)` - 生成默认验证点
+  - 调用示例: `default_points = generate_default_verification_points("新闻文本")`
+  
+- `verify_search_results_with_deepseek(content, doubt_point, search_results)` - 验证搜索结果
+  - 调用示例: `verification = verify_search_results_with_deepseek("原文内容", "待验证的观点", search_results_list)`
+  
+- `generate_default_verification_result(doubt_point, snippets, result_items=None)` - 生成默认验证结果
+  - 调用示例: `default_result = generate_default_verification_result("待验证点", ["搜索片段1", "搜索片段2"])`
+  
+- `summarize_verified_content(verification_points)` - 总结已验证内容
+  - 调用示例: `summary = summarize_verified_content(verification_points_list)`
+
+### verification.py 新闻验证函数
+
+- `generate_detailed_report(results)` - 生成详细报告
+  - 调用示例: `detailed_report = generate_detailed_report(results_dict)`
+  
+- `search_and_verify_news(text, url=None, image_paths=None, no_online=False)` - 搜索和验证新闻
+  - 调用示例: `verification_results = search_and_verify_news("新闻文本", url="https://example.com")`
+  
+- `web_cross_verification(text, api_key=None)` - 网络交叉验证
+  - 调用示例: `credibility_score, details = web_cross_verification("新闻文本")`
+  
+- `local_text_credibility(text)` - 本地文本可信度分析
+  - 调用示例: `credibility_score, credibility_details = local_text_credibility("新闻文本")`
+  
+- `analyze_citations(text)` - 分析文本中的引用质量
+  - 调用示例: `citation_analysis = analyze_citations("包含引用的新闻文本")`
+
+### web_utils.py 网络工具函数
+
+- `get_text_from_url(url, max_retries=3, backoff_factor=0.5)` - 从URL获取文本
+  - 调用示例: `content, status = get_text_from_url("https://example.com/article")`
+  
+- `search_with_searxng(query, max_attempts=3, use_local=True)` - 使用SearXNG搜索
+  - 调用示例: `search_results = search_with_searxng("搜索关键词")`
+  
+- `verify_citation_with_searxng(citation_text)` - 使用SearXNG验证引用
+  - 调用示例: `verification_result = verify_citation_with_searxng("需要验证的引用文本")`
+  
+- `test_searxng_connection()` - 测试SearXNG连接
+  - 调用示例: `is_available = test_searxng_connection()`
+  
+- `analyze_search_results(results, query)` - 分析搜索结果
+  - 调用示例: `analysis = analyze_search_results(results_dict, "原始查询")`
+  
+- `evaluate_domain_trust(url)` - 评估域名可信度
+  - 调用示例: `trust_score, trust_details = evaluate_domain_trust("https://example.com")`
+  
+- `fetch_news_content(url)` - 获取新闻内容
+  - 调用示例: `content, image_paths = fetch_news_content("https://example.com/news")`
+
+### search_services.py 搜索服务函数
+
+- `query_searxng(query, max_retries=3, num_results=5)` - 查询SearXNG搜索引擎
+  - 调用示例: `raw_results = query_searxng("搜索关键词", num_results=10)`
+  
+- `search_with_searxng(query, num_results=10)` - 使用SearXNG搜索并格式化结果
+  - 调用示例: `formatted_results = search_with_searxng("搜索关键词", num_results=5)`
+  
+- `verify_citation_with_searxng(citation_text)` - 使用SearXNG验证引用内容
+  - 调用示例: `verification = verify_citation_with_searxng("引用内容文本")`
+  
+- `test_searxng_connection()` - 测试SearXNG连接状态
+  - 调用示例: `is_connected = test_searxng_connection()`
+  
+- `test_specific_searxng_instance(searxng_base_url)` - 测试特定SearXNG实例
+  - 调用示例: `is_available = test_specific_searxng_instance("http://localhost:8080")`
+
+### ai_services.py AI服务函数
+
+- `test_deepseek_connection()` - 测试DeepSeek API连接
+  - 调用示例: `is_available = test_deepseek_connection()`
+  
+- `query_deepseek(prompt, max_retries=3)` - 直接查询DeepSeek API
+  - 调用示例: `response = query_deepseek("分析以下新闻的可信度: {新闻文本}")`
+  
+- `analyze_with_deepseek_v3(text, language='zh')` - 使用DeepSeek分析文本
+  - 调用示例: `score, details = analyze_with_deepseek_v3("需要分析的新闻文本")`
+  
+- `parse_structured_text(response)` - 解析结构化文本
+  - 调用示例: `parsed_data = parse_structured_text("DeepSeek返回的响应文本")`
+  
+- `generate_default_analysis_result(original_response)` - 生成默认分析结果
+  - 调用示例: `default_result = generate_default_analysis_result("原始响应文本")`
+  
+- `validate_and_normalize_analysis(data)` - 验证和标准化分析结果
+  - 调用示例: `normalized_data = validate_and_normalize_analysis(raw_analysis_dict)`
+  
+- `identify_citations_with_deepseek(text)` - 使用DeepSeek识别引用
+  - 调用示例: `citations = identify_citations_with_deepseek("包含引用的新闻文本")`
+  
+- `verify_citations_with_deepseek(citations, search_results)` - 使用DeepSeek验证引用
+  - 调用示例: `verification = verify_citations_with_deepseek(citations_list, search_results_list)`
+  
+- `judge_citation_with_deepseek(citation, api_key=None)` - 使用DeepSeek判断引用
+  - 调用示例: `judgment = judge_citation_with_deepseek({"content": "引用内容", "source": "来源"})`
+  
+- `analyze_citation_validity_with_deepseek(text, citations, api_key=None)` - 分析引用有效性
+  - 调用示例: `validity = analyze_citation_validity_with_deepseek("新闻文本", citations_list)`
+  
+- `analyze_suspicious_points_with_deepseek(text)` - 分析可疑点
+  - 调用示例: `suspicious_points = analyze_suspicious_points_with_deepseek("新闻文本")`
+
+### result_formatter.py 结果格式化函数
+
+- `get_credibility_summary(score, language='zh')` - 获取可信度摘要
+  - 调用示例: `summary = get_credibility_summary(0.75, language="zh")`
+  
+- `get_ai_content_description(score, language='zh')` - 获取AI内容描述
+  - 调用示例: `description = get_ai_content_description(0.3, language="zh")`
+  
+- `get_rating_emoji(score)` - 获取评分表情
+  - 调用示例: `emoji = get_rating_emoji(0.82)`
+  
+- `get_progress_bar(score, width=10)` - 获取进度条
+  - 调用示例: `progress_bar = get_progress_bar(0.65, width=15)`
+  
+- `get_credibility_rating(score, language='zh')` - 获取可信度评级
+  - 调用示例: `rating = get_credibility_rating(0.78, language="zh")`
+  
+- `validate_score(score, source="未知")` - 验证评分
+  - 调用示例: `valid_score = validate_score(raw_score, source="AI分析")`
+  
+- `validate_data(data, required_fields, context="")` - 验证数据
+  - 调用示例: `is_valid = validate_data(data_dict, ["field1", "field2"], context="验证分析结果")`
+  
+- `calculate_weighted_score(main_scores, cross_validation_data=None)` - 计算加权评分
+  - 调用示例: `total_score, weights_used, raw_scores = calculate_weighted_score(main_scores_dict)`
+  
+- `analyze_problems(result, total_score, main_scores, cross_validation_data, language='zh')` - 分析问题
+  - 调用示例: `problems = analyze_problems(result_dict, 0.65, main_scores, cross_validation)`
+  
+- `print_problems_section(problems)` - 打印问题部分
+  - 调用示例: `print_problems_section(problems_list)`
+  
+- `print_formatted_result(result, colored_output=True, language='zh')` - 打印格式化结果
+  - 调用示例: `print_formatted_result(analysis_result, language="zh")`
+  
+- `display_detailed_results(result, language='zh')` - 显示详细结果
+  - 调用示例: `display_detailed_results(full_result_dict, language="zh")`
+  
+- `get_source_level(count)` - 获取来源级别
+  - 调用示例: `level = get_source_level(5)`
+  
+- `get_citation_status(count)` - 获取引用状态
+  - 调用示例: `status = get_citation_status(3)`
+  
+- `get_quantity_level(count)` - 获取数量级别
+  - 调用示例: `level = get_quantity_level(8)`
+  
+- `get_diversity_assessment(count)` - 获取多样性评估
+  - 调用示例: `assessment = get_diversity_assessment(6)`
+  
+- `get_authority_level(count)` - 获取权威级别
+  - 调用示例: `level = get_authority_level(4)`
+
+### service_checker.py 服务检查函数
+
+- `initialize_services()` - 初始化服务
+  - 调用示例: `services_status = initialize_services()`
+  
+- `print_service_status(services_status)` - 打印服务状态
+  - 调用示例: `print_service_status(services_status_dict)`
+
+### image_analysis.py 图像分析函数
+
+- `check_images(text, image_paths=None)` - 检查图像与文本关系
+  - 调用示例: `consistency_score, details = check_images("新闻文本", ["/path/to/image1.jpg", "/path/to/image2.jpg"])`
+  
+- `analyze_image_authenticity(image_path)` - 分析图像真实性
+  - 调用示例: `authenticity_score, auth_details = analyze_image_authenticity("/path/to/image.jpg")`
+
+### utils.py 通用工具函数
+
+- `setup_logging(log_file="news_credibility.log", debug=False, verbose=False)` - 设置日志
+  - 调用示例: `logger = setup_logging(log_file="my_log.log", debug=True)`
+  
+- `colored(text, color, bold=False)` - 彩色文本
+  - 调用示例: `colored_text = colored("警告信息", Colors.YELLOW, bold=True)`
+  
+- `get_category_name(key)` - 获取分类名称
+  - 调用示例: `category = get_category_name("ai_content")`
+  
+- `load_environment_variables()` - 加载环境变量
+  - 调用示例: `success = load_environment_variables()`
+  
+- `find_common_substrings(str1, str2, min_length=5, max_time=2, max_substrings=10)` - 查找公共子串
+  - 调用示例: `common_strings = find_common_substrings("文本一", "文本二", min_length=3)`
+
+# 添加别名使t调用get_translation
+t = get_translation

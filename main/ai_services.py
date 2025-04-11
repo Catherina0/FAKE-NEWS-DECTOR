@@ -18,6 +18,34 @@ from pathlib import Path
 from dotenv import load_dotenv
 from typing import Dict, Any, Tuple, Optional, List, Union
 
+# 添加英文术语到中文的翻译字典，协助处理英文API返回结果
+ENGLISH_TO_CHINESE_TERMS = {
+    "overall_score": "总体评分",
+    "dimension_scores": "各大类评分",
+    "subdimension_scores": "细分点评分",
+    "content_truthfulness": "内容真实性",
+    "information_accuracy": "信息准确性",
+    "source_reliability": "来源可靠性",
+    "language_objectivity": "语言客观性",
+    "logical_coherence": "逻辑连贯性",
+    "citation_quality": "引用质量",
+    "ai_content_analysis": "AI生成内容",
+    "language_neutrality": "语言中立性",
+    "detailed_analysis": "详细分析",
+    "credibility_concerns": "可信度判断的疑点",
+    "expression_patterns": "表达模式",
+    "vocabulary_diversity": "词汇多样性",
+    "sentence_variation": "句子变化",
+    "contextual_coherence": "上下文连贯性",
+    "human_characteristics": "人类特征",
+    "emotional_vocabulary": "情感词汇",
+    "emotional_balance": "情感平衡",
+    "extreme_statements": "极端表述",
+    "inflammatory_expression": "煽动性表达",
+    "subjective_evaluation": "主观评价",
+    "analysis": "分析"
+}
+
 # 确保加载.env文件
 # 尝试在当前目录和父目录查找.env文件
 print("正在加载.env文件...")
@@ -300,12 +328,13 @@ def query_deepseek(prompt, max_retries=3):
     logger.error("所有DeepSeek API请求尝试均失败")
     return "DeepSeek API请求失败，请检查网络连接或稍后再试"
 
-def analyze_with_deepseek_v3(text: str) -> Tuple[float, Dict[str, Any]]:
+def analyze_with_deepseek_v3(text: str, language: str = 'zh') -> Tuple[float, Dict[str, Any]]:
     """
     使用DeepSeek API分析文本可信度
     
     参数:
         text (str): 要分析的文本
+        language (str): 输出语言，'zh'为中文，'en'为英文，默认为'zh'
     
     返回:
         Tuple[float, Dict[str, Any]]: (分数, 详细信息对象)
@@ -317,16 +346,20 @@ def analyze_with_deepseek_v3(text: str) -> Tuple[float, Dict[str, Any]]:
     # 检查API是否可用
     global DEEPSEEK_API_AVAILABLE
     if not DEEPSEEK_API_AVAILABLE:
-        raise ValueError("DeepSeek API不可用，无法进行分析")
+        error_msg = "DeepSeek API不可用，无法进行分析" if language == 'zh' else "DeepSeek API is not available, analysis cannot be performed"
+        raise ValueError(error_msg)
     
     # 限制文本长度，避免超出API限制
     max_text_length = 2000
     if len(text) > max_text_length:
-        logging.warning(f"文本长度超过{max_text_length}字符，将被截断")
-        text = text[:max_text_length] + "...(文本已截断)"
+        truncated_msg = f"文本长度超过{max_text_length}字符，将被截断" if language == 'zh' else f"Text length exceeds {max_text_length} characters, it will be truncated"
+        logging.warning(truncated_msg)
+        text = text[:max_text_length] + ("...(文本已截断)" if language == 'zh' else "...(text truncated)")
     
-    # 构建提示词，要求以JSON格式返回分析结果
-    prompt = f"""
+    # 根据语言选择提示词
+    if language == 'zh':
+        # 原始中文提示词
+        prompt = f"""
 你是一个专业的新闻可信度分析专家，请分析以下新闻内容的可信度，并按要求以JSON格式返回评分和分析。
 
 请按照以下详细标准从六个主要维度进行深入分析，每个维度的评分从0到1（1表示完全符合该维度的标准）：
@@ -443,115 +476,241 @@ B. 语言中立性（评估语言的客观中立程度）：
   "详细分析": "对整体可信度的深入分析，包含各维度之间的相互影响和总体评价",
   "可信度判断的疑点": ["具体列出可能降低可信度的问题点1", "问题点2", "问题点3"]
 }}
-
-新闻文本：
-{text}
 """
+    else:
+        # 英文提示词
+        prompt = f"""
+You are a professional news credibility analysis expert. Please analyze the credibility of the following news content and return scores and analysis in JSON format as requested.
+
+Please conduct an in-depth analysis based on the following detailed criteria across six main dimensions, with scores ranging from 0 to 1 (1 indicating complete compliance with the standards of that dimension):
+
+1. Content Truthfulness (evaluating the truthfulness of news facts):
+   - Fact Checking: Do key facts in the text have specific sources or can they be verified? Do they align with known facts?
+   - Fictional Elements: Is there exaggeration, fabrication, or unverified content?
+   - Time Accuracy: Is the description of when events occurred accurate and complete?
+   - Location Accuracy: Do geographical locations and scene descriptions match actual situations?
+   - Character Authenticity: Do the individuals mentioned actually exist, and are their words and actions accurately described?
+
+2. Information Accuracy (evaluating the precision of data and information):
+   - Data Accuracy: Are numbers, statistics, and percentages precise? Are the sources reliable?
+   - Detail Consistency: Is the information within the article consistent without contradictory statements?
+   - Technical Terminology: Are professional terms and terminology used accurately and appropriately? Is there misuse or abuse?
+   - Background Information: Is the context and background information complete and accurate, helping to understand the event?
+
+3. Source Reliability (evaluating the quality of information sources):
+   - Information Sources: Are the sources of information clearly indicated? Are the sources traceable and verifiable?
+   - Source Authority: Do the cited sources have expertise and authority in the relevant field?
+   - Multi-source Verification: Is important information corroborated by multiple independent sources? Are different sources consistent?
+   - Citation Standards: Are citation methods standardized and accurate, avoiding taking quotes out of context or misinterpreting original meanings?
+
+4. Language Objectivity (evaluating whether expression is objective and fair):
+   - Emotional Coloring: Is the language overly emotional? Are inflammatory or exaggerated words used?
+   - Bias Detection: Is there an obvious stance bias, stereotyping, or discriminatory expression?
+   - Balanced Reporting: Are multiple perspectives presented, especially on controversial topics?
+   - Rhetorical Use: Are rhetorical devices appropriate, not misleading readers or reinforcing specific positions?
+
+5. Logical Coherence (evaluating the logic and structure of the text):
+   - Causal Relationships: Are cause-and-effect relationships reasonably established, avoiding jump conclusions?
+   - Argument Completeness: Is the argument complete with sufficient evidence supporting the conclusion?
+   - Structure Clarity: Is the text structure clear and orderly, and is the exposition coherent?
+   - Reasoning Soundness: Is the reasoning process reasonable, avoiding logical fallacies?
+
+6. Citation Quality (evaluating the quality and relevance of citations):
+   - Citation Diversity: Are diverse, different types of materials and viewpoints cited?
+   - Citation Timeliness: Do the cited materials have timeliness, reflecting the latest research or situations?
+   - Citation Relevance: Is the cited content highly relevant to the topic, effectively supporting the arguments?
+
+In addition, please conduct a deeper analysis of the following two specific aspects:
+
+A. AI-Generated Content (assessing whether the text was generated by AI):
+   - Expression Patterns: Are there AI-specific expression patterns and sentence structures? (0 indicates highly mechanical, 1 indicates naturally human-like)
+   - Vocabulary Diversity: Is vocabulary use diverse and natural, avoiding being too uniform or repetitive? (0 indicates singular vocabulary, 1 indicates rich diversity)
+   - Sentence Variation: Is there natural variation in sentence length and structure? (0 indicates high consistency, 1 indicates natural variation)
+   - Contextual Coherence: Are paragraph transitions natural, and is the context coherent? (0 indicates overly perfect coherence, 1 indicates natural fluency)
+   - Human Characteristics: Does it include human-specific expressions, emotions, or perspectives? (0 indicates lack of human traits, 1 indicates rich human qualities)
+
+B. Language Neutrality (evaluating the objectivity and neutrality of language):
+   - Emotional Vocabulary: What is the frequency and intensity of emotional vocabulary used? (0 indicates excessive emotional vocabulary, 1 indicates appropriate use)
+   - Emotional Balance: Is the emotional expression balanced for different viewpoints? (0 indicates severe imbalance, 1 indicates complete balance)
+   - Extreme Statements: Are extreme, absolute statements used? (0 indicates extensive use, 1 indicates almost no use)
+   - Inflammatory Expression: Does it contain expressions that incite emotions or guide positions? (0 indicates highly inflammatory, 1 indicates completely neutral)
+   - Subjective Evaluation: Is the author's personal evaluation and judgment mixed in? (0 indicates extensive subjective evaluation, 1 indicates objective statement)
+
+Please conduct a comprehensive, detailed analysis, ensuring in-depth consideration of each dimension. Pay special attention to capturing subtle issues that might affect credibility.
+
+Note: Your response must and can only be a standard JSON object, starting with {{ and ending with }}, without any other text or explanations. Do not add any explanations or formatting characters before or after the JSON. Do not use Markdown or code block syntax. Respond directly in raw JSON format.
+
+You must strictly output according to the following JSON format, ensuring the JSON format is valid and parsable:
+{{
+  "overall_score": 0.*,
+  "dimension_scores": {{
+    "content_truthfulness": 0.*,
+    "information_accuracy": 0.*,
+    "source_reliability": 0.*,
+    "language_objectivity": 0.*,
+    "logical_coherence": 0.*,
+    "citation_quality": 0.*
+  }},
+  "subdimension_scores": {{
+    "content_truthfulness_fact_checking": 0.*,
+    "content_truthfulness_fictional_elements": 0.*,
+    "content_truthfulness_time_accuracy": 0.*,
+    "content_truthfulness_location_accuracy": 0.*,
+    "content_truthfulness_character_authenticity": 0.*,
+    "information_accuracy_data_accuracy": 0.*,
+    "information_accuracy_detail_consistency": 0.*,
+    "information_accuracy_technical_terminology": 0.*,
+    "information_accuracy_background_information": 0.*,
+    "source_reliability_information_sources": 0.*,
+    "source_reliability_source_authority": 0.*,
+    "source_reliability_multi_source_verification": 0.*,
+    "source_reliability_citation_standards": 0.*,
+    "language_objectivity_emotional_coloring": 0.*,
+    "language_objectivity_bias_detection": 0.*,
+    "language_objectivity_balanced_reporting": 0.*,
+    "language_objectivity_rhetorical_use": 0.*,
+    "logical_coherence_causal_relationships": 0.*,
+    "logical_coherence_argument_completeness": 0.*,
+    "logical_coherence_structure_clarity": 0.*,
+    "logical_coherence_reasoning_soundness": 0.*,
+    "citation_quality_citation_diversity": 0.*,
+    "citation_quality_citation_timeliness": 0.*,
+    "citation_quality_citation_relevance": 0.*
+  }},
+  "ai_content_analysis": {{
+    "expression_patterns": 0.*,
+    "vocabulary_diversity": 0.*,
+    "sentence_variation": 0.*,
+    "contextual_coherence": 0.*,
+    "human_characteristics": 0.*,
+    "analysis": "Detailed analysis of AI-generated content features with examples from the text"
+  }},
+  "language_neutrality": {{
+    "emotional_vocabulary": 0.*,
+    "emotional_balance": 0.*,
+    "extreme_statements": 0.*,
+    "inflammatory_expression": 0.*,
+    "subjective_evaluation": 0.*,
+    "analysis": "Detailed analysis of language neutrality issues with examples from the text"
+  }},
+  "detailed_analysis": "In-depth analysis of overall credibility, including interactions between dimensions and overall evaluation",
+  "credibility_concerns": ["Specific issue that may lower credibility 1", "Issue 2", "Issue 3"]
+}}
+"""
+
+    # 将新闻文本添加到提示词中
+    prompt += f"\n\n新闻文本:\n{text}" if language == 'zh' else f"\n\nNews text:\n{text}"
     
     try:
         # 调用DeepSeek API - 只调用一次，减少重复分析
         response = query_deepseek(prompt)
         if not response:
-            raise ValueError("DeepSeek API返回空响应，无法进行分析")
+            error_msg = "DeepSeek API返回空响应，无法进行分析" if language == 'zh' else "DeepSeek API returned an empty response, unable to perform analysis"
+            raise ValueError(error_msg)
         
         logging.debug(f"DeepSeek API响应: {response[:500]}...")
         
         # 解析API响应
         try:
-            import json
-            import re
-            import traceback
+            # 尝试解析JSON
+            data = json.loads(response)
             
-            # 记录原始响应以便调试
-            logging.debug(f"尝试解析的原始响应: {response[:500]}...")
-            
-            # 先尝试直接解析整个响应
-            try:
-                data = json.loads(response)
-                overall_score = data.get("总体评分", 0.5)
-                normalized_data = validate_and_normalize_analysis(data)
-                logging.info("成功直接将响应解析为JSON")
-                return overall_score, normalized_data
-            except json.JSONDecodeError:
-                logging.warning("整个响应不是有效的JSON，尝试提取JSON部分")
-            
-            # 尝试从响应中提取JSON部分
-            json_match = re.search(r'({[\s\S]*})', response)
-            if json_match:
-                json_str = json_match.group(1)
-                try:
-                    data = json.loads(json_str)
-                    
-                    # 提取总体评分
-                    overall_score = data.get("总体评分", 0.5)
-                    
-                    # 验证和标准化数据
-                    normalized_data = validate_and_normalize_analysis(data)
-                    logging.info("成功从响应中提取并解析JSON部分")
-                    
-                    return overall_score, normalized_data
-                    
-                except json.JSONDecodeError as e:
-                    logging.error(f"JSON解析错误: {e}, 原始JSON: {json_str[:200]}...")
-                    
-                    # 尝试修复常见的JSON格式问题
-                    try:
-                        # 替换单引号为双引号
-                        fixed_json = json_str.replace("'", '"')
-                        # 替换中文冒号为英文冒号
-                        fixed_json = fixed_json.replace("：", ":")
-                        # 修复可能的尾部逗号问题
-                        fixed_json = re.sub(r',\s*}', '}', fixed_json)
-                        fixed_json = re.sub(r',\s*]', ']', fixed_json)
-                        # 修复键值对格式问题
-                        fixed_json = re.sub(r'([^"{\[,])\s*:\s*', r'"\1": ', fixed_json)
-                        # 修复键名没有引号的问题
-                        fixed_json = re.sub(r'{\s*([^"{\[,][^:]*)\s*:', r'{"\\1":', fixed_json)
-                        fixed_json = re.sub(r',\s*([^"{\[,][^:]*)\s*:', r',"\1":', fixed_json)
-                        
-                        logging.debug(f"尝试修复后的JSON: {fixed_json[:200]}...")
-                        
-                        data = json.loads(fixed_json)
-                        overall_score = data.get("总体评分", 0.5)
-                        normalized_data = validate_and_normalize_analysis(data)
-                        logging.info("成功修复并解析JSON")
-                        return overall_score, normalized_data
-                    except Exception as fix_error:
-                        logging.error(f"修复JSON失败: {fix_error}")
-                        
-                        # 如果修复失败，尝试使用更宽松的方式解析
-                        try:
-                            import ast
-                            # 尝试使用ast模块解析Python字典
-                            dict_str = json_str.replace('null', 'None').replace('true', 'True').replace('false', 'False')
-                            data = ast.literal_eval(dict_str)
-                            overall_score = data.get("总体评分", 0.5)
-                            normalized_data = validate_and_normalize_analysis(data)
-                            logging.info("使用AST成功解析数据")
-                            return overall_score, normalized_data
-                        except Exception as ast_error:
-                            logging.error(f"使用ast解析失败: {ast_error}")
-            
-            # 如果以上所有方法都失败，尝试从纯文本响应中提取结构化数据
-            logging.warning("所有JSON解析方法均失败，尝试从纯文本解析结构化数据")
-            structured_data = parse_structured_text(response)
-            overall_score = structured_data.get("总体评分", 0.5)
-            normalized_data = validate_and_normalize_analysis(structured_data)
-            logging.info("从纯文本成功提取结构化数据")
-            return overall_score, normalized_data
-            
-        except Exception as e:
-            logging.error(f"解析DeepSeek响应时出错: {e}")
-            logging.error(traceback.format_exc())
-            
-            # 所有解析方法都失败，抛出错误
-            # 不再返回默认值，而是抛出错误
-            raise ValueError(f"解析DeepSeek响应失败，无法提取有效数据: {str(e)}")
+            # 根据语言选择不同处理逻辑
+            if language == 'zh':
+                # 中文响应处理
+                if not isinstance(data, dict) or "总体评分" not in data:
+                    raise ValueError("DeepSeek API未返回有效的评分数据")
+                
+                # 提取总体评分
+                score = data.get("总体评分", 0.0)
+                
+                # 返回评分和完整的分析数据
+                return score, data
+            else:
+                # 英文响应处理
+                if not isinstance(data, dict) or "overall_score" not in data:
+                    raise ValueError("DeepSeek API did not return valid scoring data")
+                
+                # 提取总体评分
+                score = data.get("overall_score", 0.0)
+                
+                # 转换英文数据格式为内部使用的中文格式
+                converted_data = {
+                    "总体评分": score,
+                    "各大类评分": {
+                        "内容真实性": data["dimension_scores"].get("content_truthfulness", 0.0),
+                        "信息准确性": data["dimension_scores"].get("information_accuracy", 0.0),
+                        "来源可靠性": data["dimension_scores"].get("source_reliability", 0.0),
+                        "语言客观性": data["dimension_scores"].get("language_objectivity", 0.0),
+                        "逻辑连贯性": data["dimension_scores"].get("logical_coherence", 0.0),
+                        "引用质量": data["dimension_scores"].get("citation_quality", 0.0)
+                    },
+                    "细分点评分": {
+                        # 内容真实性
+                        "内容真实性_事实核查": data["subdimension_scores"].get("content_truthfulness_fact_checking", 0.0),
+                        "内容真实性_虚构成分": data["subdimension_scores"].get("content_truthfulness_fictional_elements", 0.0),
+                        "内容真实性_时间准确性": data["subdimension_scores"].get("content_truthfulness_time_accuracy", 0.0),
+                        "内容真实性_地点准确性": data["subdimension_scores"].get("content_truthfulness_location_accuracy", 0.0),
+                        "内容真实性_人物真实性": data["subdimension_scores"].get("content_truthfulness_character_authenticity", 0.0),
+                        # 信息准确性
+                        "信息准确性_数据准确性": data["subdimension_scores"].get("information_accuracy_data_accuracy", 0.0),
+                        "信息准确性_细节一致性": data["subdimension_scores"].get("information_accuracy_detail_consistency", 0.0),
+                        "信息准确性_专业术语": data["subdimension_scores"].get("information_accuracy_technical_terminology", 0.0),
+                        "信息准确性_背景信息": data["subdimension_scores"].get("information_accuracy_background_information", 0.0),
+                        # 来源可靠性
+                        "来源可靠性_信息来源": data["subdimension_scores"].get("source_reliability_information_sources", 0.0),
+                        "来源可靠性_来源权威性": data["subdimension_scores"].get("source_reliability_source_authority", 0.0),
+                        "来源可靠性_多源验证": data["subdimension_scores"].get("source_reliability_multi_source_verification", 0.0),
+                        "来源可靠性_引用规范": data["subdimension_scores"].get("source_reliability_citation_standards", 0.0),
+                        # 语言客观性
+                        "语言客观性_情感色彩": data["subdimension_scores"].get("language_objectivity_emotional_coloring", 0.0),
+                        "语言客观性_偏见检测": data["subdimension_scores"].get("language_objectivity_bias_detection", 0.0),
+                        "语言客观性_平衡报道": data["subdimension_scores"].get("language_objectivity_balanced_reporting", 0.0),
+                        "语言客观性_修辞使用": data["subdimension_scores"].get("language_objectivity_rhetorical_use", 0.0),
+                        # 逻辑连贯性
+                        "逻辑连贯性_因果关系": data["subdimension_scores"].get("logical_coherence_causal_relationships", 0.0),
+                        "逻辑连贯性_论证完整性": data["subdimension_scores"].get("logical_coherence_argument_completeness", 0.0),
+                        "逻辑连贯性_结构清晰": data["subdimension_scores"].get("logical_coherence_structure_clarity", 0.0),
+                        "逻辑连贯性_推理合理": data["subdimension_scores"].get("logical_coherence_reasoning_soundness", 0.0),
+                        # 引用质量
+                        "引用质量_引用多样性": data["subdimension_scores"].get("citation_quality_citation_diversity", 0.0),
+                        "引用质量_引用时效性": data["subdimension_scores"].get("citation_quality_citation_timeliness", 0.0),
+                        "引用质量_引用相关性": data["subdimension_scores"].get("citation_quality_citation_relevance", 0.0)
+                    },
+                    "AI生成内容": {
+                        "表达模式": data["ai_content_analysis"].get("expression_patterns", 0.0),
+                        "词汇多样性": data["ai_content_analysis"].get("vocabulary_diversity", 0.0),
+                        "句子变化": data["ai_content_analysis"].get("sentence_variation", 0.0),
+                        "上下文连贯性": data["ai_content_analysis"].get("contextual_coherence", 0.0),
+                        "人类特征": data["ai_content_analysis"].get("human_characteristics", 0.0),
+                        "分析": data["ai_content_analysis"].get("analysis", "")
+                    },
+                    "语言中立性": {
+                        "情感词汇": data["language_neutrality"].get("emotional_vocabulary", 0.0),
+                        "情感平衡": data["language_neutrality"].get("emotional_balance", 0.0),
+                        "极端表述": data["language_neutrality"].get("extreme_statements", 0.0),
+                        "煽动性表达": data["language_neutrality"].get("inflammatory_expression", 0.0),
+                        "主观评价": data["language_neutrality"].get("subjective_evaluation", 0.0),
+                        "分析": data["language_neutrality"].get("analysis", "")
+                    },
+                    "详细分析": data.get("detailed_analysis", ""),
+                    "可信度判断的疑点": data.get("credibility_concerns", [])
+                }
+                
+                # 返回评分和转换后的分析数据
+                return score, converted_data
+                
+        except json.JSONDecodeError as e:
+            logging.error(f"JSON解析错误: {str(e)}")
+            raise ValueError(f"DeepSeek API返回的不是有效的JSON格式: {str(e)}")
+        except (KeyError, TypeError) as e:
+            logging.error(f"数据结构错误: {str(e)}")
+            raise ValueError(f"DeepSeek API返回的数据结构不符合预期: {str(e)}")
+        
     except Exception as e:
-        logging.error(f"调用DeepSeek API时出错: {e}")
-        logging.error(traceback.format_exc())
-        # 抛出错误而不是返回默认值
-        raise RuntimeError(f"调用DeepSeek API失败: {str(e)}")
+        error_msg = f"DeepSeek分析失败: {str(e)}" if language == 'zh' else f"DeepSeek analysis failed: {str(e)}"
+        logging.error(error_msg)
+        raise RuntimeError(error_msg)
 
 def parse_structured_text(response: str) -> Dict[str, Any]:
     """
